@@ -31,7 +31,7 @@ class JobSchedulerUser(HttpUser):
     """
 
     wait_time = between(0.5, 2)  # Wait 0.5-2 seconds between requests
-    
+
     def on_start(self):
         """Called when a user starts."""
         self.tenant_id = random.choice(TEST_TENANTS)
@@ -61,12 +61,12 @@ class JobSchedulerUser(HttpUser):
     def submit_job(self):
         """Submit a new job."""
         idempotency_key = f"load-test-{uuid.uuid4().hex}"
-        
+
         job_types = ["echo", "sleep", "http_request"]
         job_type = random.choice(job_types)
-        
+
         payload: dict[str, Any] = {"job_type": job_type}
-        
+
         if job_type == "echo":
             payload["data"] = {"message": f"Load test at {uuid.uuid4().hex[:8]}"}
         elif job_type == "sleep":
@@ -76,7 +76,7 @@ class JobSchedulerUser(HttpUser):
                 "url": "https://httpbin.org/get",
                 "method": "GET",
             }
-        
+
         response = self.client.post(
             "/v1/jobs",
             json={
@@ -90,7 +90,7 @@ class JobSchedulerUser(HttpUser):
             },
             name="/v1/jobs [POST]",
         )
-        
+
         if response.status_code == 201:
             job_id = response.json().get("id")
             if job_id:
@@ -104,7 +104,7 @@ class JobSchedulerUser(HttpUser):
         """Check status of a previously created job."""
         if not self.created_job_ids:
             return
-        
+
         job_id = random.choice(self.created_job_ids)
         self.client.get(
             f"/v1/jobs/{job_id}",
@@ -117,10 +117,10 @@ class JobSchedulerUser(HttpUser):
         """List jobs for the tenant."""
         status_filter = random.choice([None, "queued", "running", "succeeded", "dlq"])
         params = {"page": 1, "page_size": 20}
-        
+
         if status_filter:
             params["status"] = status_filter
-        
+
         self.client.get(
             "/v1/jobs",
             params=params,
@@ -178,10 +178,10 @@ class BurstSubmissionUser(HttpUser):
     def burst_submit(self):
         """Submit a burst of jobs."""
         burst_size = random.randint(10, 50)
-        
+
         for _ in range(burst_size):
             idempotency_key = f"burst-{uuid.uuid4().hex}"
-            
+
             self.client.post(
                 "/v1/jobs",
                 json={
@@ -232,7 +232,7 @@ class IdempotencyTestUser(HttpUser):
     def submit_new_job(self):
         """Submit a new job and save the key."""
         idempotency_key = f"idem-{uuid.uuid4().hex}"
-        
+
         response = self.client.post(
             "/v1/jobs",
             json={
@@ -245,7 +245,7 @@ class IdempotencyTestUser(HttpUser):
             },
             name="/v1/jobs [POST] (new)",
         )
-        
+
         if response.status_code == 201:
             self.idempotency_keys.append(idempotency_key)
             if len(self.idempotency_keys) > 50:
@@ -256,9 +256,9 @@ class IdempotencyTestUser(HttpUser):
         """Submit a job with an existing idempotency key."""
         if not self.idempotency_keys:
             return
-        
+
         idempotency_key = random.choice(self.idempotency_keys)
-        
+
         response = self.client.post(
             "/v1/jobs",
             json={
@@ -271,7 +271,7 @@ class IdempotencyTestUser(HttpUser):
             },
             name="/v1/jobs [POST] (duplicate)",
         )
-        
+
         # Should return the existing job, not create a new one
         if response.status_code == 201:
             data = response.json()

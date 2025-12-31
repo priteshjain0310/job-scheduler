@@ -2,28 +2,26 @@
 Prometheus metrics collection.
 """
 
-from typing import Any
 
 from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    REGISTRY,
+    CollectorRegistry,
     Counter,
     Gauge,
     Histogram,
-    CollectorRegistry,
     generate_latest,
-    CONTENT_TYPE_LATEST,
-    multiprocess,
-    REGISTRY,
 )
 
 from src.constants import (
-    METRIC_QUEUE_DEPTH,
-    METRIC_JOBS_SUBMITTED,
-    METRIC_JOBS_COMPLETED,
-    METRIC_JOB_DURATION,
-    METRIC_LEASE_EXPIRED,
-    METRIC_LEASE_ACQUIRED,
-    METRIC_API_REQUESTS,
     METRIC_API_LATENCY,
+    METRIC_API_REQUESTS,
+    METRIC_JOB_DURATION,
+    METRIC_JOBS_COMPLETED,
+    METRIC_JOBS_SUBMITTED,
+    METRIC_LEASE_ACQUIRED,
+    METRIC_LEASE_EXPIRED,
+    METRIC_QUEUE_DEPTH,
 )
 
 # Global metrics instance
@@ -50,7 +48,7 @@ class MetricsCollector:
             registry: Optional custom registry. Uses default if not provided.
         """
         self._registry = registry or REGISTRY
-        
+
         # Queue depth gauge (by tenant)
         self.queue_depth = Gauge(
             METRIC_QUEUE_DEPTH,
@@ -58,7 +56,7 @@ class MetricsCollector:
             ["tenant_id"],
             registry=self._registry,
         )
-        
+
         # Jobs submitted counter
         self.jobs_submitted = Counter(
             METRIC_JOBS_SUBMITTED,
@@ -66,7 +64,7 @@ class MetricsCollector:
             ["tenant_id", "priority"],
             registry=self._registry,
         )
-        
+
         # Jobs completed counter
         self.jobs_completed = Counter(
             METRIC_JOBS_COMPLETED,
@@ -74,7 +72,7 @@ class MetricsCollector:
             ["tenant_id", "status"],
             registry=self._registry,
         )
-        
+
         # Job duration histogram
         self.job_duration = Histogram(
             METRIC_JOB_DURATION,
@@ -83,7 +81,7 @@ class MetricsCollector:
             buckets=(0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0),
             registry=self._registry,
         )
-        
+
         # Lease expired counter
         self.lease_expired = Counter(
             METRIC_LEASE_EXPIRED,
@@ -91,7 +89,7 @@ class MetricsCollector:
             ["tenant_id"],
             registry=self._registry,
         )
-        
+
         # Lease acquired counter
         self.lease_acquired = Counter(
             METRIC_LEASE_ACQUIRED,
@@ -99,7 +97,7 @@ class MetricsCollector:
             ["worker_id"],
             registry=self._registry,
         )
-        
+
         # API requests counter
         self.api_requests = Counter(
             METRIC_API_REQUESTS,
@@ -107,7 +105,7 @@ class MetricsCollector:
             ["method", "endpoint", "status"],
             registry=self._registry,
         )
-        
+
         # API latency histogram
         self.api_latency = Histogram(
             METRIC_API_LATENCY,

@@ -3,7 +3,6 @@ Job management routes.
 """
 
 import logging
-from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -22,7 +21,6 @@ from src.types.api import (
     CreateJobResponse,
     JobListResponse,
     JobResponse,
-    PaginationParams,
     RetryJobRequest,
     RetryJobResponse,
 )
@@ -84,19 +82,19 @@ async def create_job(
     """
     settings = get_settings()
     repo = JobRepository(session)
-    
+
     # Check tenant concurrency limits before accepting job
     can_accept = await repo.check_tenant_concurrency(
         tenant_id=current_user.tenant_id,
         max_concurrent=settings.default_tenant_max_concurrent_jobs,
     )
-    
+
     if not can_accept:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Tenant concurrency limit exceeded",
         )
-    
+
     # Create the job
     job, created = await repo.create_job(
         tenant_id=current_user.tenant_id,
@@ -106,9 +104,9 @@ async def create_job(
         priority=request.priority,
         scheduled_at=request.scheduled_at,
     )
-    
+
     await session.commit()
-    
+
     # Record metrics
     if created:
         metrics = get_metrics()
@@ -116,7 +114,7 @@ async def create_job(
             tenant_id=current_user.tenant_id,
             priority=request.priority.value,
         )
-        
+
         # Broadcast WebSocket event
         ws_manager = get_ws_manager()
         event = JobEvent.job_created(
@@ -125,7 +123,7 @@ async def create_job(
             payload=job.payload,
         )
         await ws_manager.broadcast_job_event(event)
-    
+
     return CreateJobResponse(
         id=job.id,
         tenant_id=job.tenant_id,
@@ -163,20 +161,20 @@ async def get_job(
     """
     repo = JobRepository(session)
     job = await repo.get_job(job_id)
-    
+
     if job is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Job not found",
         )
-    
+
     # Ensure tenant owns this job
     if job.tenant_id != current_user.tenant_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied",
         )
-    
+
     return _job_to_response(job)
 
 
@@ -208,14 +206,14 @@ async def list_jobs(
     """
     repo = JobRepository(session)
     offset = (page - 1) * page_size
-    
+
     jobs, total = await repo.list_jobs(
         tenant_id=current_user.tenant_id,
         status=status,
         limit=page_size,
         offset=offset,
     )
-    
+
     return JobListResponse(
         jobs=[_job_to_response(job) for job in jobs],
         total=total,
@@ -253,47 +251,47 @@ async def retry_job(
         HTTPException: If job not found or not in DLQ.
     """
     repo = JobRepository(session)
-    
+
     # Get the job first
     job = await repo.get_job(job_id)
-    
+
     if job is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Job not found",
         )
-    
+
     if job.tenant_id != current_user.tenant_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied",
         )
-    
+
     if job.status != JobStatus.DLQ:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Job is not in DLQ (current status: {job.status})",
         )
-    
+
     # Retry the job
     updated_job = await repo.retry_from_dlq(
         job_id=job_id,
         reset_attempts=request.reset_attempts,
     )
-    
+
     await session.commit()
-    
+
     if updated_job is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retry job",
         )
-    
+
     logger.info(
-        f"Job retried from DLQ",
+        "Job retried from DLQ",
         extra={"job_id": str(job_id), "tenant_id": current_user.tenant_id}
     )
-    
+
     return RetryJobResponse(
         id=updated_job.id,
         status=updated_job.status,
@@ -324,7 +322,7 @@ async def get_job_stats(
     repo = JobRepository(session)
     stats = await repo.get_job_stats(tenant_id=current_user.tenant_id)
     queue_depth = await repo.get_queue_depth(tenant_id=current_user.tenant_id)
-    
+
     return {
         "stats": stats,
         "queue_depth": queue_depth,

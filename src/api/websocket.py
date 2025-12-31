@@ -7,7 +7,6 @@ import json
 import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any
 from uuid import UUID
 
 from fastapi import WebSocket, WebSocketDisconnect
@@ -57,20 +56,20 @@ class WebSocketManager:
             ConnectionInfo for the new connection.
         """
         await websocket.accept()
-        
+
         connection = ConnectionInfo(
             websocket=websocket,
             tenant_id=tenant_id,
         )
-        
+
         async with self._lock:
             self._connections[tenant_id].append(connection)
-        
+
         logger.info(
-            f"WebSocket connected",
+            "WebSocket connected",
             extra={"tenant_id": tenant_id}
         )
-        
+
         return connection
 
     async def disconnect(self, connection: ConnectionInfo) -> None:
@@ -84,9 +83,9 @@ class WebSocketManager:
             tenant_connections = self._connections[connection.tenant_id]
             if connection in tenant_connections:
                 tenant_connections.remove(connection)
-        
+
         logger.info(
-            f"WebSocket disconnected",
+            "WebSocket disconnected",
             extra={"tenant_id": connection.tenant_id}
         )
 
@@ -132,12 +131,12 @@ class WebSocketManager:
         """
         async with self._lock:
             connections = self._connections.get(tenant_id, []).copy()
-        
+
         if not connections:
             return
-        
+
         message_json = message.model_dump_json()
-        
+
         # Send to all connections, handling failures
         disconnected = []
         for connection in connections:
@@ -149,7 +148,7 @@ class WebSocketManager:
                     extra={"tenant_id": tenant_id}
                 )
                 disconnected.append(connection)
-        
+
         # Clean up disconnected connections
         for connection in disconnected:
             await self.disconnect(connection)
@@ -228,16 +227,16 @@ async def websocket_handler(
     """
     manager = get_ws_manager()
     connection = await manager.connect(websocket, tenant_id)
-    
+
     try:
         while True:
             # Receive and process messages from client
             data = await websocket.receive_text()
-            
+
             try:
                 message = json.loads(data)
                 action = message.get("action")
-                
+
                 if action == "subscribe":
                     job_id = UUID(message.get("job_id"))
                     await manager.subscribe_to_job(connection, job_id)
@@ -245,7 +244,7 @@ async def websocket_handler(
                         "type": "subscribed",
                         "job_id": str(job_id),
                     })
-                
+
                 elif action == "unsubscribe":
                     job_id = UUID(message.get("job_id"))
                     await manager.unsubscribe_from_job(connection, job_id)
@@ -253,15 +252,15 @@ async def websocket_handler(
                         "type": "unsubscribed",
                         "job_id": str(job_id),
                     })
-                
+
                 elif action == "ping":
                     await websocket.send_json({"type": "pong"})
-                
+
             except (json.JSONDecodeError, ValueError, KeyError) as e:
                 await websocket.send_json({
                     "type": "error",
                     "message": f"Invalid message: {e}",
                 })
-    
+
     except WebSocketDisconnect:
         await manager.disconnect(connection)

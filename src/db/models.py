@@ -20,7 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from src.constants import JobPriority, JobStatus, PRIORITY_WEIGHTS
+from src.constants import PRIORITY_WEIGHTS, JobPriority, JobStatus
 
 
 class Base(DeclarativeBase):

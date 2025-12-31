@@ -10,6 +10,7 @@ from uuid import uuid4
 
 import pytest
 import pytest_asyncio
+import sqlalchemy as sa
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import (
@@ -17,24 +18,24 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from testcontainers.postgres import PostgresContainer
 
 from src.api.auth import create_access_token
 from src.api.main import create_app
-from src.config import Settings, get_settings
-from src.db import init_db, close_db
-from src.db.models import Base
+from src.config import Settings
+from src.db import close_db, init_db
 
-
-# Test database URL (can use testcontainers or local postgres)
+# Test database URL - use separate test database
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
     "postgresql+asyncpg://postgres:postgres@localhost:5432/jobqueue_test"
 )
 
+# Set DATABASE_URL environment variable BEFORE any imports that might initialize the database
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+
 
 @pytest.fixture(scope="session")
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
+def event_loop() -> Generator[asyncio.AbstractEventLoop]:
     """Create an event loop for the test session."""
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
@@ -42,22 +43,9 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 
 
 @pytest.fixture(scope="session")
-def postgres_container() -> Generator[PostgresContainer, None, None]:
-    """
-    Start a PostgreSQL container for integration tests.
-    
-    Only used when running integration tests that need a real database.
-    """
-    with PostgresContainer("postgres:16-alpine") as postgres:
-        yield postgres
-
-
-@pytest.fixture(scope="session")
-def database_url(postgres_container: PostgresContainer) -> str:
-    """Get the database URL from the container."""
-    # Convert to async URL
-    sync_url = postgres_container.get_connection_url()
-    return sync_url.replace("postgresql://", "postgresql+asyncpg://")
+def database_url() -> str:
+    """Get the test database URL."""
+    return TEST_DATABASE_URL
 
 
 @pytest_asyncio.fixture
@@ -68,22 +56,14 @@ async def async_engine(database_url: str):
         echo=False,
         pool_pre_ping=True,
     )
-    
-    # Create all tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    
+
     yield engine
-    
-    # Drop all tables after tests
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    
+
     await engine.dispose()
 
 
 @pytest_asyncio.fixture
-async def db_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
+async def db_session(async_engine) -> AsyncGenerator[AsyncSession]:
     """Create a database session for tests."""
     session_factory = async_sessionmaker(
         bind=async_engine,
@@ -91,9 +71,15 @@ async def db_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
         expire_on_commit=False,
         autoflush=False,
     )
-    
+
     async with session_factory() as session:
+        # Clean up test data before each test to ensure clean state
+        await session.execute(sa.text("TRUNCATE TABLE jobs RESTART IDENTITY CASCADE"))
+        await session.commit()
+
         yield session
+
+        # Rollback any uncommitted changes
         await session.rollback()
 
 
@@ -111,14 +97,39 @@ def test_settings() -> Settings:
     )
 
 
-@pytest.fixture
-def app() -> FastAPI:
-    """Create a FastAPI app for testing."""
-    return create_app()
+@pytest_asyncio.fixture
+async def app(database_url: str) -> AsyncGenerator[FastAPI]:
+    """Create a FastAPI app for testing with initialized database."""
+    # Save original DATABASE_URL
+    original_db_url = os.environ.get("DATABASE_URL")
+
+    # Override settings with test database URL
+    os.environ["DATABASE_URL"] = database_url
+
+    # Clear any cached engine/session
+    from src.db.connection import _engine
+    global_engine = _engine
+    if global_engine:
+        await global_engine.dispose()
+
+    # Initialize database with test URL
+    await init_db()
+
+    app = create_app()
+    yield app
+
+    # Cleanup
+    await close_db()
+
+    # Restore original DATABASE_URL
+    if original_db_url:
+        os.environ["DATABASE_URL"] = original_db_url
+    else:
+        os.environ.pop("DATABASE_URL", None)
 
 
 @pytest_asyncio.fixture
-async def client(app: FastAPI) -> AsyncGenerator[AsyncClient, None]:
+async def client(app: FastAPI) -> AsyncGenerator[AsyncClient]:
     """Create an async HTTP client for testing."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:

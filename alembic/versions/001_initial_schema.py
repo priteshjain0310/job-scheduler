@@ -5,17 +5,18 @@ Revises:
 Create Date: 2024-01-01 00:00:00.000000
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
+
 # revision identifiers, used by Alembic.
 revision: str = "001"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -27,7 +28,7 @@ def upgrade() -> None:
             WHEN duplicate_object THEN null;
         END $$;
     """)
-    
+
     op.execute("""
         DO $$ BEGIN
             CREATE TYPE job_priority AS ENUM ('low', 'normal', 'high', 'critical');
@@ -35,7 +36,7 @@ def upgrade() -> None:
             WHEN duplicate_object THEN null;
         END $$;
     """)
-    
+
     # Create jobs table
     op.create_table(
         "jobs",
@@ -77,35 +78,35 @@ def upgrade() -> None:
         sa.Column("result", postgresql.JSONB, nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
-    
+
     # Create indexes
     op.create_index("ix_jobs_tenant_id", "jobs", ["tenant_id"])
     op.create_index("ix_jobs_status", "jobs", ["status"])
     op.create_index("ix_jobs_lease_owner", "jobs", ["lease_owner"])
     op.create_index("ix_jobs_lease_expires_at", "jobs", ["lease_expires_at"])
     op.create_index("ix_jobs_scheduled_at", "jobs", ["scheduled_at"])
-    
+
     # Create unique constraint for idempotency
     op.create_unique_constraint(
         "uq_tenant_idempotency",
         "jobs",
         ["tenant_id", "idempotency_key"],
     )
-    
+
     # Create partial index for queue polling
     op.execute("""
         CREATE INDEX ix_jobs_queue_poll 
         ON jobs (status, scheduled_at, priority) 
         WHERE status = 'queued'
     """)
-    
+
     # Create partial index for tenant active jobs
     op.execute("""
         CREATE INDEX ix_jobs_tenant_active 
         ON jobs (tenant_id, status) 
         WHERE status IN ('leased', 'running')
     """)
-    
+
     # Create partial index for lease expiry
     op.execute("""
         CREATE INDEX ix_jobs_lease_expiry 
@@ -125,10 +126,10 @@ def downgrade() -> None:
     op.drop_index("ix_jobs_status")
     op.drop_index("ix_jobs_tenant_id")
     op.drop_constraint("uq_tenant_idempotency", "jobs")
-    
+
     # Drop table
     op.drop_table("jobs")
-    
+
     # Drop enums
     op.execute("DROP TYPE IF EXISTS job_status")
     op.execute("DROP TYPE IF EXISTS job_priority")

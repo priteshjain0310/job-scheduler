@@ -19,10 +19,10 @@ def setup_logging() -> None:
     Integrates with standard library logging.
     """
     settings = get_settings()
-    
+
     # Determine log level
     log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
-    
+
     # Shared processors for all loggers
     shared_processors: list[Any] = [
         structlog.contextvars.merge_contextvars,
@@ -30,7 +30,7 @@ def setup_logging() -> None:
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.stdlib.ExtraAdder(),
     ]
-    
+
     # Configure output format
     if settings.log_format == "json":
         # JSON output for production
@@ -38,7 +38,7 @@ def setup_logging() -> None:
     else:
         # Console output for development
         renderer = structlog.dev.ConsoleRenderer(colors=True)
-    
+
     # Configure structlog
     structlog.configure(
         processors=[
@@ -50,7 +50,7 @@ def setup_logging() -> None:
         logger_factory=structlog.stdlib.LoggerFactory(),
         cache_logger_on_first_use=True,
     )
-    
+
     # Configure standard library logging
     formatter = structlog.stdlib.ProcessorFormatter(
         foreign_pre_chain=shared_processors,
@@ -59,15 +59,15 @@ def setup_logging() -> None:
             renderer,
         ],
     )
-    
+
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
-    
+
     # Configure root logger
     root_logger = logging.getLogger()
     root_logger.handlers = [handler]
     root_logger.setLevel(log_level)
-    
+
     # Reduce noise from third-party libraries
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)

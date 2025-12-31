@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel
 
@@ -45,24 +45,24 @@ def create_access_token(
         The encoded JWT token.
     """
     settings = get_settings()
-    
+
     if expires_delta is None:
         expires_delta = timedelta(minutes=settings.api_access_token_expire_minutes)
-    
+
     expire = datetime.utcnow() + expires_delta
-    
+
     to_encode = {
         "tenant_id": tenant_id,
         "exp": expire,
         "iat": datetime.utcnow(),
     }
-    
+
     encoded_jwt = jwt.encode(
         to_encode,
         settings.api_secret_key,
         algorithm=settings.api_algorithm,
     )
-    
+
     return encoded_jwt
 
 
@@ -80,7 +80,7 @@ def decode_token(token: str) -> TokenData:
         HTTPException: If token is invalid or expired.
     """
     settings = get_settings()
-    
+
     try:
         payload = jwt.decode(
             token,
@@ -89,16 +89,16 @@ def decode_token(token: str) -> TokenData:
         )
         tenant_id: str = payload.get("tenant_id")
         exp: datetime = datetime.fromtimestamp(payload.get("exp"))
-        
+
         if tenant_id is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token: missing tenant_id",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
+
         return TokenData(tenant_id=tenant_id, exp=exp)
-        
+
     except JWTError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -123,7 +123,7 @@ async def get_current_user(
         HTTPException: If authentication fails.
     """
     token_data = decode_token(credentials.credentials)
-    
+
     return AuthenticatedUser(
         tenant_id=token_data.tenant_id,
     )

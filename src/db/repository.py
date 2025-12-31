@@ -4,16 +4,16 @@ Implements the core data access patterns for job management.
 """
 
 import logging
+from collections.abc import Sequence
 from datetime import datetime, timedelta
-from typing import Sequence
 from uuid import UUID
 
-from sqlalchemy import func, select, update, and_, or_, text
+from sqlalchemy import and_, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
-from src.constants import JobStatus, JobPriority, PRIORITY_WEIGHTS
+from src.constants import JobPriority, JobStatus
 from src.db.models import Job
 
 logger = logging.getLogger(__name__)
@@ -77,22 +77,22 @@ class JobRepository:
         ).on_conflict_do_nothing(
             constraint="uq_tenant_idempotency"
         ).returning(Job)
-        
+
         result = await self._session.execute(stmt)
         job = result.scalar_one_or_none()
-        
+
         if job is not None:
             logger.info(
                 "Created new job",
                 extra={"job_id": str(job.id), "tenant_id": tenant_id}
             )
             return job, True
-        
+
         # Job already exists, fetch it
         existing = await self.get_job_by_idempotency_key(tenant_id, idempotency_key)
         if existing is None:
             raise RuntimeError("Job should exist after conflict")
-        
+
         logger.info(
             "Returned existing job (idempotent)",
             extra={"job_id": str(existing.id), "tenant_id": tenant_id}
@@ -160,12 +160,12 @@ class JobRepository:
         base_filter = Job.tenant_id == tenant_id
         if status is not None:
             base_filter = and_(base_filter, Job.status == status)
-        
+
         # Get total count
         count_stmt = select(func.count()).select_from(Job).where(base_filter)
         count_result = await self._session.execute(count_stmt)
         total = count_result.scalar() or 0
-        
+
         # Get jobs
         stmt = (
             select(Job)
@@ -176,7 +176,7 @@ class JobRepository:
         )
         result = await self._session.execute(stmt)
         jobs = result.scalars().all()
-        
+
         return jobs, total
 
     async def acquire_lease(
@@ -204,17 +204,17 @@ class JobRepository:
         )
         now = datetime.utcnow()
         lease_expires_at = now + lease_duration
-        
+
         # Build the subquery to select jobs
         # Uses FOR UPDATE SKIP LOCKED to prevent contention
         subquery_filters = [
             Job.status == JobStatus.QUEUED,
             or_(Job.scheduled_at <= now, Job.scheduled_at.is_(None)),
         ]
-        
+
         if tenant_id is not None:
             subquery_filters.append(Job.tenant_id == tenant_id)
-        
+
         # Use raw SQL for the atomic update with SKIP LOCKED
         # This ensures we don't double-lease jobs
         sql = text("""
@@ -241,7 +241,7 @@ class JobRepository:
             )
             RETURNING *
         """)
-        
+
         result = await self._session.execute(
             sql,
             {
@@ -253,15 +253,24 @@ class JobRepository:
                 "batch_size": batch_size,
             }
         )
-        
+
         rows = result.fetchall()
-        
+
         if rows:
             logger.info(
                 f"Acquired lease on {len(rows)} jobs",
                 extra={"worker_id": worker_id, "job_count": len(rows)}
             )
-        
+
+        # Sort rows by priority (RETURNING doesn't preserve ORDER BY from subquery)
+        priority_order = {
+            JobPriority.CRITICAL: 100,
+            JobPriority.HIGH: 10,
+            JobPriority.NORMAL: 5,
+            JobPriority.LOW: 1,
+        }
+        rows = sorted(rows, key=lambda r: (-priority_order.get(JobPriority(r.priority), 0), r.created_at))
+
         # Convert rows to Job objects
         jobs = []
         for row in rows:
@@ -284,7 +293,7 @@ class JobRepository:
                 result=row.result,
             )
             jobs.append(job)
-        
+
         return jobs
 
     async def check_tenant_concurrency(
@@ -310,7 +319,7 @@ class JobRepository:
         )
         result = await self._session.execute(stmt)
         current = result.scalar() or 0
-        
+
         return current < max_concurrent
 
     async def start_job(self, job_id: UUID, worker_id: str) -> Job | None:
@@ -340,16 +349,18 @@ class JobRepository:
             )
             .returning(Job)
         )
-        
+
         result = await self._session.execute(stmt)
         job = result.scalar_one_or_none()
-        
+
         if job:
+            # Refresh to get latest state from database
+            await self._session.refresh(job)
             logger.info(
-                f"Started job execution",
+                "Started job execution",
                 extra={"job_id": str(job_id), "attempt": job.attempt}
             )
-        
+
         return job
 
     async def complete_job(
@@ -389,16 +400,18 @@ class JobRepository:
             )
             .returning(Job)
         )
-        
+
         result_obj = await self._session.execute(stmt)
         job = result_obj.scalar_one_or_none()
-        
+
         if job:
+            # Refresh to get latest state from database
+            await self._session.refresh(job)
             logger.info(
-                f"Job completed successfully",
+                "Job completed successfully",
                 extra={"job_id": str(job_id)}
             )
-        
+
         return job
 
     async def fail_job(
@@ -422,16 +435,16 @@ class JobRepository:
         job = await self.get_job(job_id)
         if job is None:
             return None
-        
+
         if job.lease_owner != worker_id:
             logger.warning(
                 "Worker doesn't own job lease",
                 extra={"job_id": str(job_id), "worker_id": worker_id}
             )
             return None
-        
+
         now = datetime.utcnow()
-        
+
         # Determine next status
         if job.attempt >= job.max_attempts:
             # Max attempts reached, move to DLQ
@@ -446,10 +459,10 @@ class JobRepository:
             new_status = JobStatus.QUEUED
             completed_at = None
             logger.info(
-                f"Job queued for retry",
+                "Job queued for retry",
                 extra={"job_id": str(job_id), "attempt": job.attempt}
             )
-        
+
         stmt = (
             update(Job)
             .where(
@@ -469,9 +482,15 @@ class JobRepository:
             )
             .returning(Job)
         )
-        
+
         result = await self._session.execute(stmt)
-        return result.scalar_one_or_none()
+        job = result.scalar_one_or_none()
+
+        if job:
+            # Refresh to get latest state from database
+            await self._session.refresh(job)
+
+        return job
 
     async def retry_from_dlq(
         self,
@@ -495,10 +514,10 @@ class JobRepository:
             "completed_at": None,
             "last_error": None,
         }
-        
+
         if reset_attempts:
             values["attempt"] = 0
-        
+
         stmt = (
             update(Job)
             .where(
@@ -510,16 +529,18 @@ class JobRepository:
             .values(**values)
             .returning(Job)
         )
-        
+
         result = await self._session.execute(stmt)
         job = result.scalar_one_or_none()
-        
+
         if job:
+            # Refresh to get latest state from database
+            await self._session.refresh(job)
             logger.info(
-                f"Job retried from DLQ",
+                "Job retried from DLQ",
                 extra={"job_id": str(job_id)}
             )
-        
+
         return job
 
     async def recover_expired_leases(self) -> int:
@@ -533,7 +554,7 @@ class JobRepository:
             Number of recovered jobs.
         """
         now = datetime.utcnow()
-        
+
         stmt = (
             update(Job)
             .where(
@@ -549,15 +570,15 @@ class JobRepository:
                 updated_at=now,
             )
         )
-        
+
         result = await self._session.execute(stmt)
         count = result.rowcount
-        
+
         if count > 0:
             logger.info(
                 f"Recovered {count} jobs with expired leases"
             )
-        
+
         return count
 
     async def extend_lease(
@@ -579,10 +600,10 @@ class JobRepository:
         """
         if extension_seconds is None:
             extension_seconds = self._settings.worker_lease_duration_seconds
-        
+
         now = datetime.utcnow()
         new_expires_at = now + timedelta(seconds=extension_seconds)
-        
+
         stmt = (
             update(Job)
             .where(
@@ -597,7 +618,7 @@ class JobRepository:
                 updated_at=now,
             )
         )
-        
+
         result = await self._session.execute(stmt)
         return result.rowcount > 0
 
@@ -614,7 +635,7 @@ class JobRepository:
         filters = [Job.status == JobStatus.QUEUED]
         if tenant_id is not None:
             filters.append(Job.tenant_id == tenant_id)
-        
+
         stmt = select(func.count()).select_from(Job).where(and_(*filters))
         result = await self._session.execute(stmt)
         return result.scalar() or 0
@@ -635,13 +656,13 @@ class JobRepository:
         filters = []
         if tenant_id is not None:
             filters.append(Job.tenant_id == tenant_id)
-        
+
         stmt = (
             select(Job.status, func.count())
             .group_by(Job.status)
         )
         if filters:
             stmt = stmt.where(and_(*filters))
-        
+
         result = await self._session.execute(stmt)
         return {status.value: count for status, count in result.all()}

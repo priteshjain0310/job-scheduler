@@ -36,11 +36,11 @@ async def get_token(request: AuthRequest) -> TokenResponse:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key",
         )
-    
+
     # Create access token
     settings = get_settings()
     access_token = create_access_token(tenant_id=request.tenant_id)
-    
+
     return TokenResponse(
         access_token=access_token,
         expires_in=settings.api_access_token_expire_minutes * 60,

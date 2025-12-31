@@ -5,7 +5,6 @@ Unit tests for the job repository.
 from datetime import datetime, timedelta
 from uuid import uuid4
 
-import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -293,6 +292,7 @@ class TestJobRepository:
 
         # Manually expire the lease by updating lease_expires_at
         from sqlalchemy import update
+
         from src.db.models import Job
 
         await db_session.execute(
@@ -376,7 +376,7 @@ class TestJobRepository:
         db_session: AsyncSession,
     ):
         """Test that jobs are leased in priority order."""
-        tenant_id = "test-tenant"
+        tenant_id = f"test-tenant-{uuid4().hex[:8]}"
 
         # Create jobs with different priorities
         low, _ = await repo.create_job(

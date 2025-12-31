@@ -11,7 +11,6 @@ from src.api.auth import (
     create_access_token,
     decode_token,
     validate_api_key,
-    TokenData,
 )
 
 

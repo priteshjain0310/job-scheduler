@@ -8,7 +8,7 @@ for the same job in case of worker crashes or network issues.
 import asyncio
 import logging
 import random
-from typing import Callable, Awaitable, Any
+from collections.abc import Awaitable, Callable
 
 from src.types.job import JobContext, JobResult
 
@@ -74,10 +74,10 @@ async def handle_echo(context: JobContext) -> JobResult:
     Simply returns the input payload as output.
     """
     logger.info(
-        f"Echo job executing",
+        "Echo job executing",
         extra={"job_id": str(context.job_id), "attempt": context.attempt}
     )
-    
+
     return JobResult(
         success=True,
         output={"echo": context.payload},
@@ -93,14 +93,14 @@ async def handle_sleep(context: JobContext) -> JobResult:
     - duration_seconds: How long to sleep
     """
     duration = context.payload.get("data", {}).get("duration_seconds", 1)
-    
+
     logger.info(
-        f"Sleep job starting",
+        "Sleep job starting",
         extra={"job_id": str(context.job_id), "duration": duration}
     )
-    
+
     await asyncio.sleep(duration)
-    
+
     return JobResult(
         success=True,
         output={"slept_for": duration},
@@ -113,10 +113,10 @@ async def handle_failing_job(context: JobContext) -> JobResult:
     Handler that always fails - for testing retry logic.
     """
     logger.info(
-        f"Failing job executing (will fail)",
+        "Failing job executing (will fail)",
         extra={"job_id": str(context.job_id), "attempt": context.attempt}
     )
-    
+
     return JobResult(
         success=False,
         error=f"Intentional failure on attempt {context.attempt}",
@@ -132,17 +132,17 @@ async def handle_random_failure(context: JobContext) -> JobResult:
     - failure_rate: Probability of failure (0.0 to 1.0)
     """
     failure_rate = context.payload.get("data", {}).get("failure_rate", 0.5)
-    
+
     if random.random() < failure_rate:
         logger.warning(
-            f"Random failure triggered",
+            "Random failure triggered",
             extra={"job_id": str(context.job_id), "attempt": context.attempt}
         )
         return JobResult(
             success=False,
             error=f"Random failure on attempt {context.attempt}",
         )
-    
+
     return JobResult(
         success=True,
         output={"message": "Succeeded this time!"},
@@ -160,20 +160,20 @@ async def handle_long_running(context: JobContext) -> JobResult:
     """
     duration = context.payload.get("data", {}).get("duration_seconds", 60)
     interval = context.payload.get("data", {}).get("checkpoint_interval", 5)
-    
+
     elapsed = 0
     while elapsed < duration:
         await asyncio.sleep(min(interval, duration - elapsed))
         elapsed += interval
-        
+
         logger.info(
-            f"Long running job progress",
+            "Long running job progress",
             extra={
                 "job_id": str(context.job_id),
                 "progress": f"{elapsed}/{duration}s",
             }
         )
-    
+
     return JobResult(
         success=True,
         output={"duration": duration, "completed": True},
@@ -192,24 +192,24 @@ async def handle_http_request(context: JobContext) -> JobResult:
     - body: Optional request body
     """
     import httpx
-    
+
     data = context.payload.get("data", {})
     url = data.get("url")
     method = data.get("method", "GET").upper()
     headers = data.get("headers", {})
     body = data.get("body")
-    
+
     if not url:
         return JobResult(
             success=False,
             error="Missing 'url' in payload",
         )
-    
+
     logger.info(
-        f"HTTP request job",
+        "HTTP request job",
         extra={"job_id": str(context.job_id), "method": method, "url": url}
     )
-    
+
     try:
         async with httpx.AsyncClient() as client:
             response = await client.request(
@@ -219,7 +219,7 @@ async def handle_http_request(context: JobContext) -> JobResult:
                 json=body if method in ["POST", "PUT", "PATCH"] else None,
                 timeout=30.0,
             )
-            
+
             return JobResult(
                 success=response.is_success,
                 output={
@@ -229,7 +229,7 @@ async def handle_http_request(context: JobContext) -> JobResult:
                 },
                 error=None if response.is_success else f"HTTP {response.status_code}",
             )
-            
+
     except Exception as e:
         return JobResult(
             success=False,
@@ -249,10 +249,10 @@ async def execute_job(context: JobContext) -> JobResult:
     """
     # Get job type from payload
     job_type = context.payload.get("job_type", "echo")
-    
+
     # Find handler
     handler = get_handler(job_type)
-    
+
     if handler is None:
         logger.error(
             f"No handler for job type: {job_type}",
@@ -262,14 +262,14 @@ async def execute_job(context: JobContext) -> JobResult:
             success=False,
             error=f"No handler registered for job type: {job_type}",
         )
-    
+
     # Execute handler
     try:
         result = await handler(context)
         return result
     except Exception as e:
         logger.exception(
-            f"Handler raised exception",
+            "Handler raised exception",
             extra={"job_id": str(context.job_id), "error": str(e)}
         )
         return JobResult(

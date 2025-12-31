@@ -30,9 +30,9 @@ def setup_tracing(enable_console_export: bool = False) -> Tracer:
         Tracer: The tracer instance.
     """
     global _tracer
-    
+
     settings = get_settings()
-    
+
     # Create resource with service info
     resource = Resource.create(
         {
@@ -40,10 +40,10 @@ def setup_tracing(enable_console_export: bool = False) -> Tracer:
             "service.version": "1.0.0",
         }
     )
-    
+
     # Create tracer provider
     provider = TracerProvider(resource=resource)
-    
+
     # Add OTLP exporter
     try:
         otlp_exporter = OTLPSpanExporter(
@@ -54,19 +54,19 @@ def setup_tracing(enable_console_export: bool = False) -> Tracer:
     except Exception:
         # OTLP exporter not available, skip
         pass
-    
+
     # Optionally add console exporter for debugging
     if enable_console_export:
         provider.add_span_processor(
             BatchSpanProcessor(ConsoleSpanExporter())
         )
-    
+
     # Set the global tracer provider
     trace.set_tracer_provider(provider)
-    
+
     # Get tracer
     _tracer = trace.get_tracer(settings.otel_service_name)
-    
+
     return _tracer
 
 
@@ -119,11 +119,11 @@ def create_span(name: str, **attributes: Any) -> Any:
     """
     tracer = get_tracer()
     span = tracer.start_as_current_span(name)
-    
+
     # Set attributes if provided
     current_span = trace.get_current_span()
     for key, value in attributes.items():
         if value is not None:
             current_span.set_attribute(key, str(value))
-    
+
     return span

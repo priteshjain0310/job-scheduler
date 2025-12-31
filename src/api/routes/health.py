@@ -42,7 +42,7 @@ async def health_check(
         await session.execute(text("SELECT 1"))
     except Exception:
         db_status = "unhealthy"
-    
+
     return HealthResponse(
         status="healthy" if db_status == "healthy" else "degraded",
         version="1.0.0",

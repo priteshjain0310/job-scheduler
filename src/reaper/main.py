@@ -11,7 +11,7 @@ import logging
 import signal
 
 from src.config import get_settings
-from src.db import init_db, close_db, get_session_context
+from src.db import close_db, get_session_context, init_db
 from src.db.repository import JobRepository
 from src.observability.logging import setup_logging
 from src.observability.metrics import get_metrics
@@ -45,19 +45,19 @@ class Reaper:
         """Start the reaper loop."""
         logger.info(f"Reaper starting with interval {self.interval}s")
         self._running = True
-        
+
         while self._running:
             try:
                 recovered = await self._recover_expired_leases()
-                
+
                 if recovered > 0:
                     logger.info(f"Recovered {recovered} expired leases")
-                
+
             except Exception as e:
                 logger.exception(f"Error in reaper loop: {e}")
-            
+
             await asyncio.sleep(self.interval)
-        
+
         logger.info("Reaper stopped")
 
     async def stop(self) -> None:
@@ -74,16 +74,16 @@ class Reaper:
         """
         async with get_session_context() as session:
             repo = JobRepository(session)
-            
+
             # Recover expired leases
             count = await repo.recover_expired_leases()
-            
+
             await session.commit()
-            
+
             # Update metrics (would need tenant info for proper metrics)
             if count > 0:
                 self._metrics.lease_expired.labels(tenant_id="all").inc(count)
-            
+
             return count
 
     async def run_once(self) -> int:
@@ -100,18 +100,18 @@ async def run_async() -> None:
     """Run the reaper asynchronously."""
     setup_logging()
     await init_db()
-    
+
     reaper = Reaper()
-    
+
     # Handle shutdown signals
     loop = asyncio.get_event_loop()
-    
+
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(
             sig,
             lambda: asyncio.create_task(reaper.stop())
         )
-    
+
     try:
         await reaper.start()
     finally:

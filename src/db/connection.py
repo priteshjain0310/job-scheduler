@@ -8,10 +8,10 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
-    AsyncEngine,
 )
 from sqlalchemy.pool import NullPool
 
@@ -90,7 +90,7 @@ async def close_db() -> None:
         logger.info("Database connection closed")
 
 
-async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
+async def get_async_session() -> AsyncGenerator[AsyncSession]:
     """
     Dependency for getting async database sessions.
     
@@ -102,7 +102,7 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     """
     if AsyncSessionLocal is None:
         raise RuntimeError("Database not initialized. Call init_db() first.")
-    
+
     async with AsyncSessionLocal() as session:
         try:
             yield session
@@ -113,7 +113,7 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 @asynccontextmanager
-async def get_session_context() -> AsyncGenerator[AsyncSession, None]:
+async def get_session_context() -> AsyncGenerator[AsyncSession]:
     """
     Context manager for getting async database sessions.
     Useful for non-FastAPI contexts like workers.
@@ -123,7 +123,7 @@ async def get_session_context() -> AsyncGenerator[AsyncSession, None]:
     """
     if AsyncSessionLocal is None:
         raise RuntimeError("Database not initialized. Call init_db() first.")
-    
+
     async with AsyncSessionLocal() as session:
         try:
             yield session

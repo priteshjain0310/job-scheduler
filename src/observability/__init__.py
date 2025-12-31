@@ -3,13 +3,13 @@ Observability module.
 Contains logging, metrics, and tracing setup.
 """
 
-from src.observability.logging import setup_logging, get_logger
+from src.observability.logging import get_logger, setup_logging
 from src.observability.metrics import (
-    setup_metrics,
-    get_metrics,
     MetricsCollector,
+    get_metrics,
+    setup_metrics,
 )
-from src.observability.tracing import setup_tracing, get_tracer
+from src.observability.tracing import get_tracer, setup_tracing
 
 __all__ = [
     "setup_logging",

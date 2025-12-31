@@ -2,7 +2,6 @@
 Integration tests for worker functionality.
 """
 
-import asyncio
 from datetime import datetime, timedelta
 from uuid import uuid4
 
@@ -10,7 +9,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.constants import JobPriority, JobStatus
+from src.constants import JobStatus
 from src.db.repository import JobRepository
 from src.types.job import JobContext
 from src.worker.handlers import execute_job
@@ -173,6 +172,7 @@ class TestWorkerIntegration:
 
         # Simulate worker crash by expiring the lease
         from sqlalchemy import update
+
         from src.db.models import Job
 
         await db_session.execute(
