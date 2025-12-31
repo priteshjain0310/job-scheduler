@@ -625,6 +625,305 @@ job-scheduler/
 
 ---
 
+## Kubernetes Deployment
+
+### 🚀 Quick Deploy to Local Kubernetes
+
+**One-command deployment:**
+
+```bash
+./deploy-local-k8s.sh
+```
+
+This script will:
+- ✅ Detect/start Minikube or Kind
+- ✅ Build all Docker images locally
+- ✅ Create namespace and secrets
+- ✅ Deploy PostgreSQL, API, Workers, Reaper, and Dashboard
+- ✅ Run database migrations
+- ✅ Show access information
+
+**Options:**
+```bash
+./deploy-local-k8s.sh --clean        # Remove existing deployment first
+./deploy-local-k8s.sh --skip-build   # Skip image building
+./deploy-local-k8s.sh --help         # Show help
+```
+
+### 📋 Prerequisites
+
+- **Docker** - [Install Docker](https://docs.docker.com/get-docker/)
+- **kubectl** - [Install kubectl](https://kubernetes.io/docs/tasks/tools/)
+- **Minikube** (recommended) or **Kind** for local clusters
+
+### 🔍 What Gets Deployed
+
+| Component | Replicas | Auto-Scale | Purpose |
+|-----------|----------|------------|---------|
+| **PostgreSQL** | 1 | No | Database (StatefulSet) |
+| **API** | 3 | 2-10 | REST API endpoints |
+| **Worker** | 3 | 2-20 | Job processors |
+| **Reaper** | 1 | No | Lease recovery |
+| **Dashboard** | 2 | 2-10 | Web UI |
+
+### 🌐 Access Services
+
+**API:**
+```bash
+kubectl port-forward svc/jobqueue-api-service 8000:80 -n jobqueue
+# Access: http://localhost:8000
+# Swagger: http://localhost:8000/docs
+# Metrics: http://localhost:8000/metrics
+```
+
+**Dashboard:**
+```bash
+kubectl port-forward svc/jobqueue-dashboard-service 3000:80 -n jobqueue
+# Access: http://localhost:3000
+```
+
+**For Minikube:**
+```bash
+minikube service jobqueue-api-service -n jobqueue  # Opens in browser
+```
+
+### 🧪 Test the Deployment
+
+```bash
+# Create a test job
+curl -X POST "http://localhost:8000/api/v1/jobs" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tenant_id": "demo-tenant",
+    "idempotency_key": "test-1",
+    "payload": {
+      "job_type": "echo",
+      "data": {"message": "Hello Kubernetes!"}
+    }
+  }'
+
+# List jobs
+curl "http://localhost:8000/api/v1/jobs?tenant_id=demo-tenant"
+```
+
+### 📊 Monitor Your Deployment
+
+```bash
+# View all pods
+kubectl get pods -n jobqueue
+
+# View logs
+kubectl logs -f deployment/jobqueue-api -n jobqueue
+kubectl logs -f deployment/jobqueue-worker -n jobqueue
+kubectl logs -f deployment/jobqueue-dashboard -n jobqueue
+
+# Watch auto-scaling
+kubectl get hpa -n jobqueue --watch
+
+# Check resource usage
+kubectl top pods -n jobqueue
+```
+
+### ⚙️ Scale Workers
+
+```bash
+# Manual scaling
+kubectl scale deployment jobqueue-worker --replicas=10 -n jobqueue
+
+# Auto-scaling is already configured (2-20 replicas based on CPU)
+```
+
+### 🧹 Cleanup
+
+```bash
+kubectl delete namespace jobqueue
+```
+
+### 🏗️ Production Deployment (EKS/GKE/AKS)
+
+**1. Build and Push Images:**
+
+```bash
+# Set your registry
+export REGISTRY=ghcr.io/your-org
+export VERSION=v1.0.0
+
+# Build and push
+docker build -f Dockerfile.api -t ${REGISTRY}/jobqueue-api:${VERSION} .
+docker build -f Dockerfile.worker -t ${REGISTRY}/jobqueue-worker:${VERSION} .
+docker build -f Dockerfile.reaper -t ${REGISTRY}/jobqueue-reaper:${VERSION} .
+docker build -f dashboard/Dockerfile -t ${REGISTRY}/jobqueue-dashboard:${VERSION} ./dashboard
+
+docker push ${REGISTRY}/jobqueue-api:${VERSION}
+docker push ${REGISTRY}/jobqueue-worker:${VERSION}
+docker push ${REGISTRY}/jobqueue-reaper:${VERSION}
+docker push ${REGISTRY}/jobqueue-dashboard:${VERSION}
+```
+
+**2. Update Image References:**
+
+```bash
+# Update k8s manifests with your registry and version
+sed -i "s|image: jobqueue-api:latest|image: ${REGISTRY}/jobqueue-api:${VERSION}|g" k8s/api.yaml
+sed -i "s|image: jobqueue-worker:latest|image: ${REGISTRY}/jobqueue-worker:${VERSION}|g" k8s/worker.yaml
+sed -i "s|image: jobqueue-reaper:latest|image: ${REGISTRY}/jobqueue-reaper:${VERSION}|g" k8s/reaper.yaml
+sed -i "s|image: jobqueue-dashboard:latest|image: ${REGISTRY}/jobqueue-dashboard:${VERSION}|g" k8s/dashboard.yaml
+sed -i "s|imagePullPolicy: Never|imagePullPolicy: IfNotPresent|g" k8s/*.yaml
+```
+
+**3. Create Secrets:**
+
+```bash
+# Generate secure passwords
+DB_PASSWORD=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)
+API_SECRET=$(openssl rand -base64 32)
+
+# Create secret
+kubectl create secret generic jobqueue-secret \
+  --from-literal=DATABASE_URL="postgresql+asyncpg://postgres:${DB_PASSWORD}@postgres-service:5432/jobqueue" \
+  --from-literal=API_SECRET_KEY="${API_SECRET}" \
+  --from-literal=POSTGRES_USER="postgres" \
+  --from-literal=POSTGRES_PASSWORD="${DB_PASSWORD}" \
+  --namespace=jobqueue
+```
+
+**4. Deploy:**
+
+```bash
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/postgres.yaml
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=postgres -n jobqueue --timeout=300s
+kubectl apply -f k8s/migration-job.yaml
+kubectl wait --for=condition=complete job/jobqueue-migrate -n jobqueue --timeout=300s
+kubectl apply -f k8s/api.yaml
+kubectl apply -f k8s/worker.yaml
+kubectl apply -f k8s/reaper.yaml
+kubectl apply -f k8s/dashboard.yaml
+```
+
+**5. Optional Production Features:**
+
+```bash
+# Pod Disruption Budgets
+kubectl apply -f k8s/pdb.yaml
+
+# Network Policies
+kubectl apply -f k8s/network-policy.yaml
+
+# Prometheus Monitoring (requires Prometheus Operator)
+kubectl apply -f k8s/servicemonitor.yaml
+
+# Ingress (update with your domain)
+kubectl apply -f k8s/ingress.yaml
+```
+
+### 🔄 CI/CD Pipeline
+
+GitHub Actions workflow included (`.github/workflows/deploy.yaml`):
+
+**On every push:**
+1. ✅ Run tests with PostgreSQL
+2. ✅ Build Docker images for API, Worker, Reaper, Dashboard
+3. ✅ Push to container registry
+4. ✅ Deploy to staging (develop branch)
+5. ✅ Deploy to production (main branch)
+
+**Setup:**
+1. Add secrets to GitHub repository:
+   - `KUBE_CONFIG_STAGING` - Kubeconfig for staging cluster
+   - `KUBE_CONFIG_PROD` - Kubeconfig for production cluster
+   - `SLACK_WEBHOOK` - (Optional) For deployment notifications
+
+2. Update registry in `.github/workflows/deploy.yaml`:
+   ```yaml
+   env:
+     REGISTRY: ghcr.io
+     IMAGE_PREFIX: ${{ github.repository }}
+   ```
+
+### 📈 Monitoring & Observability
+
+**Key Metrics:**
+
+| Metric | Description | Alert Threshold |
+|--------|-------------|-----------------|
+| `job_queue_depth` | Jobs waiting to be processed | > 1000 |
+| `worker_count` | Active worker pods | < 2 |
+| `job_processing_time_p95` | 95th percentile processing time | > 300s |
+| `job_failed_total` | Total failed jobs | Rate > 10% |
+| `api_request_duration_p95` | API latency (95th percentile) | > 1s |
+
+**Access Metrics:**
+```bash
+# Prometheus format metrics
+curl http://localhost:8000/metrics
+```
+
+### 🐛 Troubleshooting
+
+**Workers Not Scaling:**
+```bash
+# Check HPA status
+kubectl describe hpa jobqueue-worker-hpa -n jobqueue
+
+# Check metrics server
+kubectl top nodes
+kubectl top pods -n jobqueue
+```
+
+**Jobs Not Processing:**
+```bash
+# Check worker logs
+kubectl logs -f deployment/jobqueue-worker -n jobqueue
+
+# Check job count in database
+kubectl exec -it postgres-0 -n jobqueue -- \
+  psql -U postgres jobqueue -c "SELECT status, COUNT(*) FROM jobs GROUP BY status;"
+```
+
+**Database Connection Issues:**
+```bash
+# Test connectivity
+kubectl run -it --rm debug --image=postgres:16-alpine -n jobqueue -- \
+  psql postgresql://postgres:password@postgres-service:5432/jobqueue
+
+# Check PostgreSQL logs
+kubectl logs -f postgres-0 -n jobqueue
+```
+
+### 🎯 Scaling Recommendations
+
+**Small Workload (< 1,000 jobs/hour):**
+- API: 2 replicas
+- Workers: 2-5 replicas
+- Database: Single instance
+
+**Medium Workload (1,000-10,000 jobs/hour):**
+- API: 3-5 replicas
+- Workers: 5-15 replicas (HPA enabled)
+- Database: Consider read replicas
+
+**Large Workload (> 10,000 jobs/hour):**
+- API: 5-10 replicas
+- Workers: 10-50 replicas (HPA enabled)
+- Database: Managed service (RDS, Cloud SQL, Azure Database)
+- Consider: PgBouncer for connection pooling
+
+### 🔐 Security Checklist
+
+- [x] Non-root containers (UID 1000)
+- [x] Network policies configured
+- [x] Secrets for sensitive data
+- [x] Pod disruption budgets
+- [x] Resource limits set
+- [ ] TLS/SSL on ingress (configure cert-manager)
+- [ ] RBAC policies (use service accounts)
+- [ ] Image scanning (add to CI/CD)
+- [ ] Audit logging enabled
+
+---
+
 ## License
 
 MIT License - See LICENSE file for details.
