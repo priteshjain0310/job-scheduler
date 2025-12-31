@@ -632,7 +632,7 @@ job-scheduler/
 **One-command deployment:**
 
 ```bash
-./deploy-local-k8s.sh
+./scripts/deploy-local-k8s.sh
 ```
 
 This script will:
@@ -645,9 +645,9 @@ This script will:
 
 **Options:**
 ```bash
-./deploy-local-k8s.sh --clean        # Remove existing deployment first
-./deploy-local-k8s.sh --skip-build   # Skip image building
-./deploy-local-k8s.sh --help         # Show help
+./scripts/deploy-local-k8s.sh --clean        # Remove existing deployment first
+./scripts/deploy-local-k8s.sh --skip-build   # Skip image building
+./scripts/deploy-local-k8s.sh --help         # Show help
 ```
 
 ### 📋 Prerequisites
@@ -921,6 +921,212 @@ kubectl logs -f postgres-0 -n jobqueue
 - [ ] RBAC policies (use service accounts)
 - [ ] Image scanning (add to CI/CD)
 - [ ] Audit logging enabled
+
+---
+
+## Load Testing
+
+### Quick Load Test
+
+```bash
+# Simple bash-based test
+./scripts/k8s-load-test.sh 1000 50  # 1000 jobs, 50 concurrent
+```
+
+### Locust Load Testing (Recommended)
+
+**Install Locust:**
+```bash
+pip install locust
+```
+
+**Run tests:**
+
+```bash
+# Interactive Web UI
+./scripts/run-locust-test.sh web
+# Open http://localhost:8089
+
+# Headless with reports
+./scripts/run-locust-test.sh headless 200 20 10m
+
+# Specific scenarios
+./scripts/run-locust-test.sh normal 100 10 5m      # Normal traffic
+./scripts/run-locust-test.sh burst 100 10 5m       # Burst traffic
+./scripts/run-locust-test.sh idempotency 50 10 3m  # Idempotency test
+```
+
+**Test Scenarios:**
+- **JobSchedulerUser** - Normal traffic (job creation, status checks, listing)
+- **BurstSubmissionUser** - Burst traffic (10-50 jobs in rapid bursts)
+- **IdempotencyTestUser** - Validates no duplicate jobs created
+
+**Performance Benchmarks:**
+
+| Metric | Good | Acceptable | Poor |
+|--------|------|------------|------|
+| Response Time (p50) | < 100ms | 100-300ms | > 300ms |
+| Response Time (p95) | < 500ms | 500-1000ms | > 1000ms |
+| Throughput | > 100 req/s | 50-100 req/s | < 50 req/s |
+| Failure Rate | < 0.1% | 0.1-1% | > 1% |
+
+**Monitor during tests:**
+```bash
+# Watch worker auto-scaling
+kubectl get hpa -n jobqueue --watch
+
+# Monitor resources
+watch kubectl top pods -n jobqueue
+
+# Check job processing
+kubectl exec -it postgres-0 -n jobqueue -- \
+  psql -U postgres jobqueue -c \
+  "SELECT status, COUNT(*) FROM jobs GROUP BY status;"
+```
+
+---
+
+## Rate Limiting
+
+### Overview
+
+Per-tenant rate limiting using token bucket algorithm:
+- **Default limit**: 100 requests/minute per tenant
+- **Burst capacity**: 200 requests (2x rate)
+- **Per-tenant isolation**: Independent limits for each tenant
+
+### Test Rate Limiting
+
+```bash
+# Quick test (150 requests to trigger rate limiting)
+./scripts/test-rate-limit.sh
+
+# Test specific tenant
+./scripts/test-rate-limit.sh my-tenant 300
+
+# Test multiple tenants (independent limits)
+./scripts/test-rate-limit.sh tenant-1 200
+./scripts/test-rate-limit.sh tenant-2 200
+```
+
+**Expected results:**
+- First ~200 requests succeed (burst capacity)
+- Subsequent requests get 429 Too Many Requests
+- Tokens refill at ~1.67/second
+
+### Configure Rate Limits
+
+**Update ConfigMap:**
+```bash
+kubectl edit configmap jobqueue-config -n jobqueue
+
+# Add or modify:
+data:
+  RATE_LIMIT_REQUESTS_PER_MINUTE: "50"  # Change from default 100
+
+# Restart API
+kubectl rollout restart deployment/jobqueue-api -n jobqueue
+```
+
+**Rate limit response:**
+```json
+HTTP 429 Too Many Requests
+{
+  "error": "Rate limit exceeded. Retry after 5.2 seconds"
+}
+Headers: Retry-After: 6
+```
+
+### Client-Side Handling
+
+```python
+import time
+import requests
+
+def create_job_with_retry(data, max_retries=3):
+    for attempt in range(max_retries):
+        response = requests.post(url, json=data)
+        
+        if response.status_code == 201:
+            return response.json()
+        
+        if response.status_code == 429:
+            retry_after = int(response.headers.get('Retry-After', 1))
+            time.sleep(retry_after)
+            continue
+        
+        response.raise_for_status()
+```
+
+---
+
+## Request Tracing
+
+### Overview
+
+Distributed tracing with OpenTelemetry:
+- Trace IDs in all logs
+- Jaeger for visual trace exploration
+- End-to-end request tracking (API → Worker → Completion)
+
+### Deploy Jaeger
+
+```bash
+# Deploy Jaeger to Kubernetes
+kubectl apply -f k8s/jaeger.yaml
+
+# Restart pods to enable trace logging
+kubectl rollout restart deployment/jobqueue-api -n jobqueue
+kubectl rollout restart deployment/jobqueue-worker -n jobqueue
+
+# Access Jaeger UI
+kubectl port-forward svc/jaeger-query -n jobqueue 16686:16686
+open http://localhost:16686
+```
+
+### Trace a Request
+
+**Method 1: Using Jaeger UI (Recommended)**
+
+1. Open Jaeger UI at http://localhost:16686
+2. Select service: `jobqueue-api`
+3. Click "Find Traces"
+4. Click any trace to see full timeline
+
+**Method 2: Using Logs**
+
+```bash
+# Create a job
+./scripts/create-demo-jobs.sh demo-tenant 1
+
+# Find trace ID in logs
+TRACE_ID=$(kubectl logs -l app.kubernetes.io/name=jobqueue-api -n jobqueue --tail=100 | \
+  grep "Job created" | tail -1 | grep -o '"trace_id":"[^"]*"' | cut -d'"' -f4)
+
+# Search all logs for this trace
+./scripts/trace-request.sh $TRACE_ID
+```
+
+**What you see in traces:**
+- Full request timeline
+- All spans with durations (API → DB → Worker)
+- Performance bottlenecks
+- Error traces highlighted
+- Service dependencies
+
+### Trace Context in Logs
+
+After rebuilding images, all logs include:
+```json
+{
+  "event": "Job created",
+  "trace_id": "a1b2c3d4e5f6789012345678901234567890",
+  "span_id": "1234567890abcdef",
+  "job_id": "uuid-here",
+  "tenant_id": "demo-tenant",
+  "timestamp": "2025-12-31T07:30:00.000Z"
+}
+```
 
 ---
 
