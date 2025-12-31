@@ -7,8 +7,29 @@ import sys
 from typing import Any
 
 import structlog
+from opentelemetry import trace
 
 from src.config import get_settings
+
+
+def add_trace_context(logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
+    """
+    Add OpenTelemetry trace context to log records.
+
+    Args:
+        logger: The logger instance.
+        method_name: The method name being called.
+        event_dict: The event dictionary.
+
+    Returns:
+        The event dictionary with trace context added.
+    """
+    span = trace.get_current_span()
+    if span and span.is_recording():
+        ctx = span.get_span_context()
+        event_dict["trace_id"] = format(ctx.trace_id, "032x")
+        event_dict["span_id"] = format(ctx.span_id, "016x")
+    return event_dict
 
 
 def setup_logging() -> None:
@@ -26,6 +47,7 @@ def setup_logging() -> None:
     # Shared processors for all loggers
     shared_processors: list[Any] = [
         structlog.contextvars.merge_contextvars,
+        add_trace_context,  # Add trace_id and span_id to logs
         structlog.processors.add_log_level,
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.stdlib.ExtraAdder(),
