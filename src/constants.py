@@ -9,7 +9,7 @@ from enum import StrEnum
 class JobStatus(StrEnum):
     """
     Job lifecycle states.
-    
+
     State transitions:
     - QUEUED -> LEASED (lease acquired)
     - LEASED -> RUNNING (execution started)

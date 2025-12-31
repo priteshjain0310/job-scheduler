@@ -14,7 +14,7 @@ from fastapi import HTTPException, Request, status
 class TokenBucket:
     """
     Token bucket for rate limiting.
-    
+
     Implements a simple token bucket algorithm for per-tenant rate limiting.
     """
 
@@ -26,10 +26,10 @@ class TokenBucket:
     def consume(self, tokens: float = 1.0) -> bool:
         """
         Try to consume tokens from the bucket.
-        
+
         Args:
             tokens: Number of tokens to consume.
-            
+
         Returns:
             True if tokens were consumed, False if rate limited.
         """
@@ -57,7 +57,7 @@ class TokenBucket:
 class RateLimiter:
     """
     In-memory rate limiter using token buckets.
-    
+
     Thread-safe rate limiting for API requests on a per-tenant basis.
     For production, consider using Redis-based rate limiting.
     """
@@ -69,7 +69,7 @@ class RateLimiter:
     ):
         """
         Initialize the rate limiter.
-        
+
         Args:
             requests_per_minute: Maximum requests per minute per tenant.
             burst_capacity: Maximum burst size. Defaults to 2x rate.
@@ -91,11 +91,11 @@ class RateLimiter:
     def check(self, key: str, tokens: float = 1.0) -> tuple[bool, float]:
         """
         Check if a request is allowed.
-        
+
         Args:
             key: Rate limit key (usually tenant_id).
             tokens: Number of tokens to consume.
-            
+
         Returns:
             Tuple of (allowed, wait_time_seconds).
         """
@@ -130,7 +130,7 @@ def rate_limit_dependency(
 ) -> None:
     """
     FastAPI dependency for rate limiting.
-    
+
     Raises HTTPException 429 if rate limit is exceeded.
     """
     # Get tenant from auth header if available
@@ -161,10 +161,10 @@ def rate_limit_dependency(
 def create_rate_limit_middleware(app_instance: Callable) -> Callable:
     """
     Create rate limiting middleware for FastAPI.
-    
+
     Args:
         app_instance: The FastAPI application.
-        
+
     Returns:
         The middleware function.
     """

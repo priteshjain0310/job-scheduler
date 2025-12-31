@@ -18,8 +18,8 @@ spec:
     spec:
       containers:
         - name: reaper
-          image: jobqueue-worker:latest
-          imagePullPolicy: IfNotPresent
+          image: localhost:5001/jobqueue-reaper:local
+          imagePullPolicy: Never
           command: ["python", "-m", "src.reaper.main"]
           envFrom:
             - configMapRef:

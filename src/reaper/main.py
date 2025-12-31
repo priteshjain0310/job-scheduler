@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class Reaper:
     """
     Lease reaper that recovers expired job leases.
-    
+
     Runs periodically to:
     1. Find jobs in LEASED status with expired lease_expires_at
     2. Return them to QUEUED status for reprocessing
@@ -32,7 +32,7 @@ class Reaper:
     def __init__(self, interval_seconds: int | None = None):
         """
         Initialize the reaper.
-        
+
         Args:
             interval_seconds: Seconds between reaper runs.
         """
@@ -68,7 +68,7 @@ class Reaper:
     async def _recover_expired_leases(self) -> int:
         """
         Find and recover jobs with expired leases.
-        
+
         Returns:
             Number of jobs recovered.
         """
@@ -89,7 +89,7 @@ class Reaper:
     async def run_once(self) -> int:
         """
         Run the reaper once (for testing or cron-style execution).
-        
+
         Returns:
             Number of jobs recovered.
         """

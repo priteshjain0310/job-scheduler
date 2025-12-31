@@ -24,13 +24,13 @@ _handlers: dict[str, JobHandler] = {}
 def register_handler(job_type: str) -> Callable[[JobHandler], JobHandler]:
     """
     Decorator to register a job handler.
-    
+
     Args:
         job_type: The job type this handler processes.
-        
+
     Returns:
         Decorator function.
-        
+
     Example:
         @register_handler("send_email")
         async def handle_send_email(context: JobContext) -> JobResult:
@@ -46,10 +46,10 @@ def register_handler(job_type: str) -> Callable[[JobHandler], JobHandler]:
 def get_handler(job_type: str) -> JobHandler | None:
     """
     Get the handler for a job type.
-    
+
     Args:
         job_type: The job type.
-        
+
     Returns:
         The handler function or None if not found.
     """
@@ -70,7 +70,7 @@ def list_handlers() -> list[str]:
 async def handle_echo(context: JobContext) -> JobResult:
     """
     Echo handler for testing.
-    
+
     Simply returns the input payload as output.
     """
     logger.info(
@@ -88,7 +88,7 @@ async def handle_echo(context: JobContext) -> JobResult:
 async def handle_sleep(context: JobContext) -> JobResult:
     """
     Sleep handler for testing delays.
-    
+
     Payload should contain:
     - duration_seconds: How long to sleep
     """
@@ -127,7 +127,7 @@ async def handle_failing_job(context: JobContext) -> JobResult:
 async def handle_random_failure(context: JobContext) -> JobResult:
     """
     Handler that randomly fails - for testing retry behavior.
-    
+
     Payload should contain:
     - failure_rate: Probability of failure (0.0 to 1.0)
     """
@@ -153,7 +153,7 @@ async def handle_random_failure(context: JobContext) -> JobResult:
 async def handle_long_running(context: JobContext) -> JobResult:
     """
     Long running job for testing lease extension.
-    
+
     Payload should contain:
     - duration_seconds: How long the job takes
     - checkpoint_interval: How often to log progress
@@ -184,7 +184,7 @@ async def handle_long_running(context: JobContext) -> JobResult:
 async def handle_http_request(context: JobContext) -> JobResult:
     """
     Make an HTTP request.
-    
+
     Payload should contain:
     - url: The URL to request
     - method: HTTP method (GET, POST, etc.)
@@ -240,10 +240,10 @@ async def handle_http_request(context: JobContext) -> JobResult:
 async def execute_job(context: JobContext) -> JobResult:
     """
     Execute a job using the appropriate handler.
-    
+
     Args:
         context: The job context.
-        
+
     Returns:
         JobResult from the handler.
     """

@@ -20,13 +20,13 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 async def get_token(request: AuthRequest) -> TokenResponse:
     """
     Get an access token using API key authentication.
-    
+
     Args:
         request: Authentication request with API key and tenant ID.
-        
+
     Returns:
         TokenResponse with JWT access token.
-        
+
     Raises:
         HTTPException: If authentication fails.
     """

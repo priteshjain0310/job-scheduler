@@ -31,7 +31,7 @@ config.set_main_option("sqlalchemy.url", settings.database_url)
 def run_migrations_offline() -> None:
     """
     Run migrations in 'offline' mode.
-    
+
     Configures the context with just a URL and not an Engine.
     Calls to context.execute() emit the given string to the script output.
     """
@@ -72,7 +72,7 @@ async def run_async_migrations() -> None:
 def run_migrations_online() -> None:
     """
     Run migrations in 'online' mode.
-    
+
     Creates an Engine and associates a connection with the context.
     """
     asyncio.run(run_async_migrations())

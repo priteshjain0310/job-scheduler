@@ -67,16 +67,16 @@ async def create_job(
 ) -> CreateJobResponse:
     """
     Create a new job.
-    
+
     Submission is idempotent based on (tenant_id, idempotency_key).
     If a job with the same key exists, returns the existing job.
-    
+
     Args:
         request: Job creation request.
         current_user: Authenticated user context.
         idempotency_key: Unique key for idempotent submission.
         session: Database session.
-        
+
     Returns:
         CreateJobResponse with job details.
     """
@@ -147,15 +147,15 @@ async def get_job(
 ) -> JobResponse:
     """
     Get job details by ID.
-    
+
     Args:
         job_id: The job UUID.
         current_user: Authenticated user context.
         session: Database session.
-        
+
     Returns:
         JobResponse with full job details.
-        
+
     Raises:
         HTTPException: If job not found or not owned by tenant.
     """
@@ -193,14 +193,14 @@ async def list_jobs(
 ) -> JobListResponse:
     """
     List jobs for the current tenant.
-    
+
     Args:
         current_user: Authenticated user context.
         page: Page number (1-indexed).
         page_size: Number of items per page.
         status: Optional status filter.
         session: Database session.
-        
+
     Returns:
         JobListResponse with paginated jobs.
     """
@@ -237,16 +237,16 @@ async def retry_job(
 ) -> RetryJobResponse:
     """
     Retry a job from the DLQ.
-    
+
     Args:
         job_id: The job UUID.
         current_user: Authenticated user context.
         request: Retry request options.
         session: Database session.
-        
+
     Returns:
         RetryJobResponse with updated job info.
-        
+
     Raises:
         HTTPException: If job not found or not in DLQ.
     """
@@ -311,11 +311,11 @@ async def get_job_stats(
 ) -> dict:
     """
     Get job statistics for the current tenant.
-    
+
     Args:
         current_user: Authenticated user context.
         session: Database session.
-        
+
     Returns:
         Dictionary of status -> count.
     """

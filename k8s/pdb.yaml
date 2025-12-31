@@ -1,0 +1,23 @@
+# Pod Disruption Budgets - Ensure high availability during voluntary disruptions
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: jobqueue-api-pdb
+  namespace: jobqueue
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: jobqueue-api
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: jobqueue-worker-pdb
+  namespace: jobqueue
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: jobqueue-worker

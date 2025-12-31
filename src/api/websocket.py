@@ -28,7 +28,7 @@ class ConnectionInfo:
 class WebSocketManager:
     """
     Manager for WebSocket connections.
-    
+
     Handles connection lifecycle and message broadcasting
     for real-time job status updates.
     """
@@ -47,11 +47,11 @@ class WebSocketManager:
     ) -> ConnectionInfo:
         """
         Accept a new WebSocket connection.
-        
+
         Args:
             websocket: The WebSocket connection.
             tenant_id: The tenant identifier.
-            
+
         Returns:
             ConnectionInfo for the new connection.
         """
@@ -75,7 +75,7 @@ class WebSocketManager:
     async def disconnect(self, connection: ConnectionInfo) -> None:
         """
         Handle WebSocket disconnection.
-        
+
         Args:
             connection: The connection to remove.
         """
@@ -96,7 +96,7 @@ class WebSocketManager:
     ) -> None:
         """
         Subscribe a connection to job updates.
-        
+
         Args:
             connection: The WebSocket connection.
             job_id: The job to subscribe to.
@@ -110,7 +110,7 @@ class WebSocketManager:
     ) -> None:
         """
         Unsubscribe a connection from job updates.
-        
+
         Args:
             connection: The WebSocket connection.
             job_id: The job to unsubscribe from.
@@ -124,7 +124,7 @@ class WebSocketManager:
     ) -> None:
         """
         Broadcast a message to all connections for a tenant.
-        
+
         Args:
             tenant_id: The tenant identifier.
             message: The message to broadcast.
@@ -156,7 +156,7 @@ class WebSocketManager:
     async def broadcast_job_event(self, event: JobEvent) -> None:
         """
         Broadcast a job event to relevant connections.
-        
+
         Args:
             event: The job event to broadcast.
         """
@@ -170,11 +170,11 @@ class WebSocketManager:
     ) -> bool:
         """
         Send a message to a specific connection.
-        
+
         Args:
             connection: The target connection.
             message: The message to send.
-            
+
         Returns:
             True if sent successfully, False otherwise.
         """
@@ -190,10 +190,10 @@ class WebSocketManager:
     def get_connection_count(self, tenant_id: str | None = None) -> int:
         """
         Get the number of active connections.
-        
+
         Args:
             tenant_id: Optional tenant filter.
-            
+
         Returns:
             Number of active connections.
         """
@@ -220,7 +220,7 @@ async def websocket_handler(
 ) -> None:
     """
     Handle a WebSocket connection for job updates.
-    
+
     Args:
         websocket: The WebSocket connection.
         tenant_id: The tenant identifier.

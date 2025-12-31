@@ -18,8 +18,8 @@ spec:
     spec:
       containers:
         - name: worker
-          image: jobqueue-worker:latest
-          imagePullPolicy: IfNotPresent
+          image: localhost:5001/jobqueue-worker:local
+          imagePullPolicy: Never
           envFrom:
             - configMapRef:
                 name: jobqueue-config

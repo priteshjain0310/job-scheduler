@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """
     Application lifespan manager.
-    
+
     Handles startup and shutdown events.
     """
     # Startup
@@ -47,11 +47,11 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     """
     Create and configure the FastAPI application.
-    
+
     Returns:
         FastAPI: The configured application instance.
     """
-    settings = get_settings()
+    get_settings()
 
     app = FastAPI(
         title="Job Scheduler API",
@@ -90,7 +90,7 @@ def create_app() -> FastAPI:
     ):
         """
         WebSocket endpoint for real-time job updates.
-        
+
         Clients should provide their tenant_id as a query parameter.
         After connecting, clients can subscribe to specific jobs.
         """

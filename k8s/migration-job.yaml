@@ -12,9 +12,15 @@ spec:
     spec:
       containers:
         - name: migrate
-          image: jobqueue-api:latest
-          imagePullPolicy: IfNotPresent
+          image: localhost:5001/jobqueue-api:local
+          imagePullPolicy: Never
           command: ["python", "-m", "alembic", "upgrade", "head"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: jobqueue-secret
+                  key: DATABASE_URL
           envFrom:
             - configMapRef:
                 name: jobqueue-config

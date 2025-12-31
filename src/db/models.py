@@ -32,10 +32,10 @@ class Base(DeclarativeBase):
 class Job(Base):
     """
     Job model representing a unit of work in the queue.
-    
+
     This is the authoritative source of truth for job state.
     All job lifecycle transitions are managed through this table.
-    
+
     Key constraints:
     - (tenant_id, idempotency_key) is unique for submission idempotency
     - status transitions follow the defined state machine

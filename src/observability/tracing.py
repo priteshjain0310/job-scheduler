@@ -22,10 +22,10 @@ _tracer: Tracer | None = None
 def setup_tracing(enable_console_export: bool = False) -> Tracer:
     """
     Set up OpenTelemetry tracing.
-    
+
     Args:
         enable_console_export: If True, also export spans to console.
-        
+
     Returns:
         Tracer: The tracer instance.
     """
@@ -73,7 +73,7 @@ def setup_tracing(enable_console_export: bool = False) -> Tracer:
 def instrument_fastapi(app: Any) -> None:
     """
     Instrument FastAPI application with OpenTelemetry.
-    
+
     Args:
         app: The FastAPI application instance.
     """
@@ -83,7 +83,7 @@ def instrument_fastapi(app: Any) -> None:
 def instrument_sqlalchemy(engine: Any) -> None:
     """
     Instrument SQLAlchemy engine with OpenTelemetry.
-    
+
     Args:
         engine: The SQLAlchemy engine instance.
     """
@@ -93,10 +93,10 @@ def instrument_sqlalchemy(engine: Any) -> None:
 def get_tracer() -> Tracer:
     """
     Get the tracer instance.
-    
+
     Returns:
         Tracer: The tracer instance.
-        
+
     Raises:
         RuntimeError: If tracing is not set up.
     """
@@ -109,11 +109,11 @@ def get_tracer() -> Tracer:
 def create_span(name: str, **attributes: Any) -> Any:
     """
     Create a new span with the given name and attributes.
-    
+
     Args:
         name: Span name.
         **attributes: Span attributes.
-        
+
     Returns:
         A context manager for the span.
     """

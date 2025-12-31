@@ -31,7 +31,7 @@ _metrics: "MetricsCollector | None" = None
 class MetricsCollector:
     """
     Prometheus metrics collector for the job scheduler.
-    
+
     Collects metrics for:
     - Queue depth
     - Job submissions and completions
@@ -43,7 +43,7 @@ class MetricsCollector:
     def __init__(self, registry: CollectorRegistry | None = None):
         """
         Initialize the metrics collector.
-        
+
         Args:
             registry: Optional custom registry. Uses default if not provided.
         """
@@ -172,7 +172,7 @@ class MetricsCollector:
 def setup_metrics() -> MetricsCollector:
     """
     Set up and return the metrics collector.
-    
+
     Returns:
         MetricsCollector: The metrics collector instance.
     """
@@ -185,10 +185,10 @@ def setup_metrics() -> MetricsCollector:
 def get_metrics() -> MetricsCollector:
     """
     Get the metrics collector instance.
-    
+
     Returns:
         MetricsCollector: The metrics collector instance.
-        
+
     Raises:
         RuntimeError: If metrics are not set up.
     """

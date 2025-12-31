@@ -27,12 +27,12 @@ async def health_check(
 ) -> HealthResponse:
     """
     Perform a health check.
-    
+
     Checks database connectivity and returns service status.
-    
+
     Args:
         session: Database session.
-        
+
     Returns:
         HealthResponse with service status.
     """
@@ -61,10 +61,10 @@ async def readiness_check(
 ) -> dict:
     """
     Kubernetes readiness probe endpoint.
-    
+
     Args:
         session: Database session.
-        
+
     Returns:
         Ready status.
     """
@@ -83,7 +83,7 @@ async def readiness_check(
 async def liveness_check() -> dict:
     """
     Kubernetes liveness probe endpoint.
-    
+
     Returns:
         Alive status.
     """
@@ -98,7 +98,7 @@ async def liveness_check() -> dict:
 async def metrics() -> Response:
     """
     Expose Prometheus metrics.
-    
+
     Returns:
         Prometheus-formatted metrics.
     """

@@ -22,7 +22,7 @@ TEST_TENANTS = [f"load-test-tenant-{i}" for i in range(5)]
 class JobSchedulerUser(HttpUser):
     """
     Simulated user for load testing the job scheduler.
-    
+
     Simulates realistic traffic patterns:
     - Job submissions (most common)
     - Job status checks

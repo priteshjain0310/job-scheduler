@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 class Worker:
     """
     Job worker that polls for and executes jobs.
-    
+
     Features:
     - Atomic lease acquisition using FOR UPDATE SKIP LOCKED
     - Heartbeat to extend leases for long-running jobs
@@ -44,7 +44,7 @@ class Worker:
     ):
         """
         Initialize the worker.
-        
+
         Args:
             worker_id: Unique worker identifier. Defaults to hostname + PID.
             batch_size: Number of jobs to acquire per poll.
@@ -113,7 +113,7 @@ class Worker:
     async def _poll_and_execute(self) -> int:
         """
         Poll for jobs and execute them.
-        
+
         Returns:
             Number of jobs processed.
         """
@@ -154,12 +154,12 @@ class Worker:
     async def _execute_job(self, job: Any) -> None:
         """
         Execute a single job.
-        
+
         Handles the full lifecycle:
         1. Transition to RUNNING
         2. Execute the handler
         3. Mark as SUCCEEDED or handle failure
-        
+
         Args:
             job: The job to execute.
         """
@@ -291,7 +291,7 @@ class Worker:
     async def _heartbeat_loop(self) -> None:
         """
         Periodically extend leases on running jobs.
-        
+
         This prevents jobs from being reclaimed by the reaper
         while they're still being executed.
         """

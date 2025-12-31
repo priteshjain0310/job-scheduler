@@ -27,7 +27,7 @@ AsyncSessionLocal: async_sessionmaker[AsyncSession] | None = None
 def get_engine() -> AsyncEngine:
     """
     Get or create the async database engine.
-    
+
     Returns:
         AsyncEngine: The SQLAlchemy async engine instance.
     """
@@ -47,10 +47,10 @@ def get_engine() -> AsyncEngine:
 def get_test_engine(database_url: str) -> AsyncEngine:
     """
     Create a test database engine with NullPool.
-    
+
     Args:
         database_url: The database URL for testing.
-        
+
     Returns:
         AsyncEngine: The test SQLAlchemy async engine instance.
     """
@@ -93,10 +93,10 @@ async def close_db() -> None:
 async def get_async_session() -> AsyncGenerator[AsyncSession]:
     """
     Dependency for getting async database sessions.
-    
+
     Yields:
         AsyncSession: An async database session.
-        
+
     Raises:
         RuntimeError: If the database is not initialized.
     """
@@ -117,7 +117,7 @@ async def get_session_context() -> AsyncGenerator[AsyncSession]:
     """
     Context manager for getting async database sessions.
     Useful for non-FastAPI contexts like workers.
-    
+
     Yields:
         AsyncSession: An async database session.
     """

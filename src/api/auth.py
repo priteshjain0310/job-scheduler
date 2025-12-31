@@ -36,11 +36,11 @@ def create_access_token(
 ) -> str:
     """
     Create a JWT access token.
-    
+
     Args:
         tenant_id: The tenant identifier.
         expires_delta: Optional custom expiration time.
-        
+
     Returns:
         The encoded JWT token.
     """
@@ -69,13 +69,13 @@ def create_access_token(
 def decode_token(token: str) -> TokenData:
     """
     Decode and validate a JWT token.
-    
+
     Args:
         token: The JWT token to decode.
-        
+
     Returns:
         TokenData extracted from the token.
-        
+
     Raises:
         HTTPException: If token is invalid or expired.
     """
@@ -112,13 +112,13 @@ async def get_current_user(
 ) -> AuthenticatedUser:
     """
     FastAPI dependency to get the current authenticated user.
-    
+
     Args:
         credentials: The HTTP authorization credentials.
-        
+
     Returns:
         AuthenticatedUser with tenant information.
-        
+
     Raises:
         HTTPException: If authentication fails.
     """
@@ -136,14 +136,14 @@ CurrentUser = Annotated[AuthenticatedUser, Depends(get_current_user)]
 def validate_api_key(api_key: str, tenant_id: str) -> bool:
     """
     Validate an API key for a tenant.
-    
+
     In a production system, this would check against a database or cache.
     For this implementation, we use a simple format check.
-    
+
     Args:
         api_key: The API key to validate.
         tenant_id: The tenant identifier.
-        
+
     Returns:
         True if the API key is valid.
     """

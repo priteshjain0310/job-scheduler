@@ -14,7 +14,7 @@ from src.config import get_settings
 def setup_logging() -> None:
     """
     Configure structured logging for the application.
-    
+
     Sets up structlog with JSON or console output based on configuration.
     Integrates with standard library logging.
     """
@@ -77,10 +77,10 @@ def setup_logging() -> None:
 def get_logger(name: str) -> structlog.stdlib.BoundLogger:
     """
     Get a structured logger instance.
-    
+
     Args:
         name: Logger name (usually __name__).
-        
+
     Returns:
         BoundLogger: A structlog logger instance.
     """
@@ -90,7 +90,7 @@ def get_logger(name: str) -> structlog.stdlib.BoundLogger:
 def bind_context(**kwargs: Any) -> None:
     """
     Bind context variables to all subsequent log messages.
-    
+
     Args:
         **kwargs: Key-value pairs to add to log context.
     """

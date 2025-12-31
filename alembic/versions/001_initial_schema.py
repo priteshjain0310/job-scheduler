@@ -1,7 +1,7 @@
 """Initial schema with jobs table
 
 Revision ID: 001
-Revises: 
+Revises:
 Create Date: 2024-01-01 00:00:00.000000
 
 """
@@ -95,22 +95,22 @@ def upgrade() -> None:
 
     # Create partial index for queue polling
     op.execute("""
-        CREATE INDEX ix_jobs_queue_poll 
-        ON jobs (status, scheduled_at, priority) 
+        CREATE INDEX ix_jobs_queue_poll
+        ON jobs (status, scheduled_at, priority)
         WHERE status = 'queued'
     """)
 
     # Create partial index for tenant active jobs
     op.execute("""
-        CREATE INDEX ix_jobs_tenant_active 
-        ON jobs (tenant_id, status) 
+        CREATE INDEX ix_jobs_tenant_active
+        ON jobs (tenant_id, status)
         WHERE status IN ('leased', 'running')
     """)
 
     # Create partial index for lease expiry
     op.execute("""
-        CREATE INDEX ix_jobs_lease_expiry 
-        ON jobs (lease_expires_at) 
+        CREATE INDEX ix_jobs_lease_expiry
+        ON jobs (lease_expires_at)
         WHERE status = 'leased'
     """)
 

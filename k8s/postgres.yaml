@@ -39,12 +39,12 @@ spec:
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: jobqueue-secrets
+                  name: jobqueue-secret
                   key: POSTGRES_USER
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: jobqueue-secrets
+                  name: jobqueue-secret
                   key: POSTGRES_PASSWORD
             - name: POSTGRES_DB
               value: jobqueue

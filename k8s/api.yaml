@@ -18,8 +18,8 @@ spec:
     spec:
       containers:
         - name: api
-          image: jobqueue-api:latest
-          imagePullPolicy: IfNotPresent
+          image: localhost:5001/jobqueue-api:local
+          imagePullPolicy: Never
           ports:
             - containerPort: 8000
               name: http
@@ -30,8 +30,13 @@ spec:
             - name: API_SECRET_KEY
               valueFrom:
                 secretKeyRef:
-                  name: jobqueue-secrets
+                  name: jobqueue-secret
                   key: API_SECRET_KEY
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: jobqueue-secret
+                  key: DATABASE_URL
           livenessProbe:
             httpGet:
               path: /live

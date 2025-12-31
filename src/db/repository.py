@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class JobRepository:
     """
     Repository for job database operations.
-    
+
     Implements atomic operations for:
     - Job submission with idempotency
     - Lease acquisition with FOR UPDATE SKIP LOCKED
@@ -33,7 +33,7 @@ class JobRepository:
     def __init__(self, session: AsyncSession):
         """
         Initialize the repository with a database session.
-        
+
         Args:
             session: The async database session.
         """
@@ -51,9 +51,9 @@ class JobRepository:
     ) -> tuple[Job, bool]:
         """
         Create a new job with idempotency support.
-        
+
         Uses INSERT ... ON CONFLICT DO NOTHING to ensure exactly-once submission.
-        
+
         Args:
             tenant_id: The tenant identifier.
             idempotency_key: Unique key for idempotent submission.
@@ -61,7 +61,7 @@ class JobRepository:
             max_attempts: Maximum retry attempts.
             priority: Job priority level.
             scheduled_at: Optional scheduled execution time.
-            
+
         Returns:
             Tuple of (Job, created) where created is True if new job was created.
         """
@@ -102,10 +102,10 @@ class JobRepository:
     async def get_job(self, job_id: UUID) -> Job | None:
         """
         Get a job by ID.
-        
+
         Args:
             job_id: The job UUID.
-            
+
         Returns:
             The Job or None if not found.
         """
@@ -120,11 +120,11 @@ class JobRepository:
     ) -> Job | None:
         """
         Get a job by tenant and idempotency key.
-        
+
         Args:
             tenant_id: The tenant identifier.
             idempotency_key: The idempotency key.
-            
+
         Returns:
             The Job or None if not found.
         """
@@ -146,13 +146,13 @@ class JobRepository:
     ) -> tuple[Sequence[Job], int]:
         """
         List jobs for a tenant with optional filtering.
-        
+
         Args:
             tenant_id: The tenant identifier.
             status: Optional status filter.
             limit: Maximum number of jobs to return.
             offset: Offset for pagination.
-            
+
         Returns:
             Tuple of (jobs, total_count).
         """
@@ -187,15 +187,15 @@ class JobRepository:
     ) -> Sequence[Job]:
         """
         Acquire lease on available jobs using FOR UPDATE SKIP LOCKED.
-        
+
         This is the critical path for job distribution. Uses atomic operations
         to prevent double-leasing.
-        
+
         Args:
             worker_id: The worker identifier.
             tenant_id: Optional tenant filter.
             batch_size: Number of jobs to acquire.
-            
+
         Returns:
             List of leased jobs.
         """
@@ -219,7 +219,7 @@ class JobRepository:
         # This ensures we don't double-lease jobs
         sql = text("""
             UPDATE jobs
-            SET 
+            SET
                 lease_owner = :worker_id,
                 lease_expires_at = :lease_expires_at,
                 status = :leased_status,
@@ -228,8 +228,8 @@ class JobRepository:
                 SELECT id FROM jobs
                 WHERE status = :queued_status
                 AND (scheduled_at <= :now OR scheduled_at IS NULL)
-                ORDER BY 
-                    CASE priority 
+                ORDER BY
+                    CASE priority
                         WHEN 'critical' THEN 100
                         WHEN 'high' THEN 10
                         WHEN 'normal' THEN 5
@@ -303,11 +303,11 @@ class JobRepository:
     ) -> bool:
         """
         Check if tenant has capacity for more concurrent jobs.
-        
+
         Args:
             tenant_id: The tenant identifier.
             max_concurrent: Maximum concurrent jobs allowed.
-            
+
         Returns:
             True if tenant has capacity, False otherwise.
         """
@@ -325,11 +325,11 @@ class JobRepository:
     async def start_job(self, job_id: UUID, worker_id: str) -> Job | None:
         """
         Transition job from LEASED to RUNNING.
-        
+
         Args:
             job_id: The job UUID.
             worker_id: The worker identifier (must match lease owner).
-            
+
         Returns:
             Updated Job or None if transition failed.
         """
@@ -371,12 +371,12 @@ class JobRepository:
     ) -> Job | None:
         """
         Mark job as successfully completed.
-        
+
         Args:
             job_id: The job UUID.
             worker_id: The worker identifier.
             result: Optional job result data.
-            
+
         Returns:
             Updated Job or None if transition failed.
         """
@@ -422,12 +422,12 @@ class JobRepository:
     ) -> Job | None:
         """
         Handle job failure. Either retry or move to DLQ.
-        
+
         Args:
             job_id: The job UUID.
             worker_id: The worker identifier.
             error: Error message.
-            
+
         Returns:
             Updated Job or None if transition failed.
         """
@@ -499,11 +499,11 @@ class JobRepository:
     ) -> Job | None:
         """
         Retry a job from the dead letter queue.
-        
+
         Args:
             job_id: The job UUID.
             reset_attempts: Whether to reset the attempt counter.
-            
+
         Returns:
             Updated Job or None if not found or not in DLQ.
         """
@@ -546,10 +546,10 @@ class JobRepository:
     async def recover_expired_leases(self) -> int:
         """
         Recover jobs with expired leases.
-        
+
         This is called by the reaper to handle worker crashes.
         Jobs in LEASED status with expired leases are returned to QUEUED.
-        
+
         Returns:
             Number of recovered jobs.
         """
@@ -589,12 +589,12 @@ class JobRepository:
     ) -> bool:
         """
         Extend the lease on a job (heartbeat).
-        
+
         Args:
             job_id: The job UUID.
             worker_id: The worker identifier.
             extension_seconds: Lease extension duration.
-            
+
         Returns:
             True if lease was extended, False otherwise.
         """
@@ -625,10 +625,10 @@ class JobRepository:
     async def get_queue_depth(self, tenant_id: str | None = None) -> int:
         """
         Get the number of queued jobs.
-        
+
         Args:
             tenant_id: Optional tenant filter.
-            
+
         Returns:
             Number of queued jobs.
         """
@@ -646,10 +646,10 @@ class JobRepository:
     ) -> dict[str, int]:
         """
         Get job statistics by status.
-        
+
         Args:
             tenant_id: Optional tenant filter.
-            
+
         Returns:
             Dictionary of status -> count.
         """

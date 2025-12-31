@@ -1,0 +1,115 @@
+# Network Policies - Restrict pod-to-pod communication for security
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jobqueue-api-netpol
+  namespace: jobqueue
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: jobqueue-api
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector: {}  # Allow from any namespace (adjust for production)
+    ports:
+    - protocol: TCP
+      port: 8000
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:  # Allow DNS
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jobqueue-worker-netpol
+  namespace: jobqueue
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: jobqueue-worker
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:  # Allow DNS
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jobqueue-reaper-netpol
+  namespace: jobqueue
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: jobqueue-reaper
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:  # Allow DNS
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-netpol
+  namespace: jobqueue
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: api
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: worker
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: reaper
+    ports:
+    - protocol: TCP
+      port: 5432
