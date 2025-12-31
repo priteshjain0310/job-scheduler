@@ -1,0 +1,124 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: load-test-script
+  namespace: jobqueue
+data:
+  load-test.sh: |
+    #!/bin/bash
+    set -e
+    
+    TOTAL_JOBS=${TOTAL_JOBS:-1000}
+    CONCURRENT=${CONCURRENT:-50}
+    TENANT_ID="load-test-$(date +%s)"
+    API_URL="http://jobqueue-api-service"
+    
+    echo "🚀 Starting Load Test"
+    echo "  Total Jobs: $TOTAL_JOBS"
+    echo "  Concurrent: $CONCURRENT"
+    echo "  Tenant ID: $TENANT_ID"
+    echo ""
+    
+    # Wait for API to be ready
+    until curl -s ${API_URL}/health > /dev/null 2>&1; do
+        echo "Waiting for API..."
+        sleep 2
+    done
+    
+    echo "✓ API is ready"
+    echo ""
+    
+    # Create jobs
+    echo "Creating jobs..."
+    START_TIME=$(date +%s)
+    
+    # Get auth token
+    echo "Getting auth token..."
+    TOKEN=$(curl -s -X POST "${API_URL}/auth/token" \
+      -H "Content-Type: application/json" \
+      -d "{\"tenant_id\": \"${TENANT_ID}\", \"api_key\": \"load-test-key\"}" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+    
+    if [ -z "$TOKEN" ]; then
+        echo "Failed to get auth token"
+        exit 1
+    fi
+    
+    echo "✓ Got auth token"
+    echo ""
+    
+    for i in $(seq 1 $TOTAL_JOBS); do
+        curl -X POST "${API_URL}/v1/jobs" \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer ${TOKEN}" \
+          -H "Idempotency-Key: load-test-${i}" \
+          -d "{
+            \"tenant_id\": \"${TENANT_ID}\",
+            \"payload\": {
+              \"job_type\": \"echo\",
+              \"data\": {\"message\": \"Load test job ${i}\"}
+            }
+          }" \
+          -s -o /dev/null &
+        
+        # Limit concurrent requests
+        if [ $((i % CONCURRENT)) -eq 0 ]; then
+            wait
+            echo "  Created $i jobs..."
+        fi
+    done
+    
+    wait
+    END_TIME=$(date +%s)
+    DURATION=$((END_TIME - START_TIME))
+    
+    echo ""
+    echo "✓ Load test complete!"
+    echo "  Created: $TOTAL_JOBS jobs"
+    echo "  Duration: ${DURATION}s"
+    echo "  Rate: $((TOTAL_JOBS / DURATION)) jobs/sec"
+    echo "  Tenant ID: $TENANT_ID"
+    echo ""
+    echo "Monitor with:"
+    echo "  kubectl logs -f job/load-test -n jobqueue"
+    echo "  kubectl get hpa -n jobqueue --watch"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: load-test
+  namespace: jobqueue
+  labels:
+    app: load-test
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: load-test
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: load-test
+          image: curlimages/curl:latest
+          command: ["/bin/sh", "/scripts/load-test.sh"]
+          env:
+            - name: TOTAL_JOBS
+              value: "1000"
+            - name: CONCURRENT
+              value: "50"
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "500m"
+      volumes:
+        - name: script
+          configMap:
+            name: load-test-script
+            defaultMode: 0755

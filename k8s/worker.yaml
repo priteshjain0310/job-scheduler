@@ -60,7 +60,7 @@ spec:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: 70
+          averageUtilization: 25
     # Custom metric for queue depth (requires Prometheus Adapter)
     # - type: External
     #   external:
