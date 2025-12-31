@@ -125,6 +125,10 @@ build_images() {
     print_step "Building Reaper image..."
     docker build -f Dockerfile.reaper -t ${REGISTRY}/jobqueue-reaper:${VERSION} .
     
+    # Dashboard
+    print_step "Building Dashboard image..."
+    docker build -f dashboard/Dockerfile -t ${REGISTRY}/jobqueue-dashboard:${VERSION} ./dashboard
+    
     print_step "✓ All images built successfully"
 }
 
@@ -166,7 +170,7 @@ update_manifests() {
     cp -r k8s/* "${TMP_DIR}/"
     
     # Update image references
-    for file in "${TMP_DIR}"/api.yaml "${TMP_DIR}"/worker.yaml "${TMP_DIR}"/reaper.yaml "${TMP_DIR}"/migration-job.yaml; do
+    for file in "${TMP_DIR}"/api.yaml "${TMP_DIR}"/worker.yaml "${TMP_DIR}"/reaper.yaml "${TMP_DIR}"/migration-job.yaml "${TMP_DIR}"/dashboard.yaml; do
         if [ -f "$file" ]; then
             sed -i.bak "s|image: jobqueue-\(.*\):latest|image: ${REGISTRY}/jobqueue-\1:${VERSION}|g" "$file"
             sed -i.bak "s|imagePullPolicy: IfNotPresent|imagePullPolicy: Never|g" "$file"
@@ -207,6 +211,7 @@ deploy_k8s() {
     kubectl apply -f "${MANIFEST_DIR}/api.yaml"
     kubectl apply -f "${MANIFEST_DIR}/worker.yaml"
     kubectl apply -f "${MANIFEST_DIR}/reaper.yaml"
+    kubectl apply -f "${MANIFEST_DIR}/dashboard.yaml"
     
     # Optional: Deploy monitoring and security
     if [ -f "${MANIFEST_DIR}/pdb.yaml" ]; then
@@ -228,6 +233,7 @@ wait_for_deployments() {
     kubectl rollout status deployment/jobqueue-api -n ${NAMESPACE} --timeout=300s
     kubectl rollout status deployment/jobqueue-worker -n ${NAMESPACE} --timeout=300s
     kubectl rollout status deployment/jobqueue-reaper -n ${NAMESPACE} --timeout=300s
+    kubectl rollout status deployment/jobqueue-dashboard -n ${NAMESPACE} --timeout=300s
     
     print_step "✓ All deployments ready"
 }
@@ -258,24 +264,36 @@ show_access_info() {
     K8S_ENV=$(detect_k8s_env)
     if [ "$K8S_ENV" = "minikube" ]; then
         MINIKUBE_IP=$(minikube ip)
-        NODE_PORT=$(kubectl get svc jobqueue-api -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}')
-        echo "  URL: http://${MINIKUBE_IP}:${NODE_PORT}"
-        echo "  Or run: minikube service jobqueue-api -n ${NAMESPACE}"
+        NODE_PORT=$(kubectl get svc jobqueue-api-service -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "N/A")
+        if [ "$NODE_PORT" != "N/A" ]; then
+            echo "  URL: http://${MINIKUBE_IP}:${NODE_PORT}"
+        fi
+        echo "  Or run: kubectl port-forward svc/jobqueue-api-service 8000:80 -n ${NAMESPACE}"
     elif [ "$K8S_ENV" = "kind" ]; then
-        echo "  Run: kubectl port-forward svc/jobqueue-api 8000:80 -n ${NAMESPACE}"
+        echo "  Run: kubectl port-forward svc/jobqueue-api-service 8000:80 -n ${NAMESPACE}"
         echo "  Then access: http://localhost:8000"
     else
-        echo "  Run: kubectl port-forward svc/jobqueue-api 8000:80 -n ${NAMESPACE}"
+        echo "  Run: kubectl port-forward svc/jobqueue-api-service 8000:80 -n ${NAMESPACE}"
         echo "  Then access: http://localhost:8000"
     fi
     
     echo ""
+    echo -e "${GREEN}Access Dashboard:${NC}"
+    if [ "$K8S_ENV" = "minikube" ]; then
+        echo "  Run: kubectl port-forward svc/jobqueue-dashboard-service 3000:80 -n ${NAMESPACE}"
+    else
+        echo "  Run: kubectl port-forward svc/jobqueue-dashboard-service 3000:80 -n ${NAMESPACE}"
+    fi
+    echo "  Then access: http://localhost:3000"
+    
+    echo ""
     echo -e "${GREEN}Useful Commands:${NC}"
-    echo "  View API logs:    kubectl logs -f deployment/jobqueue-api -n ${NAMESPACE}"
-    echo "  View worker logs: kubectl logs -f deployment/jobqueue-worker -n ${NAMESPACE}"
-    echo "  Scale workers:    kubectl scale deployment jobqueue-worker --replicas=5 -n ${NAMESPACE}"
-    echo "  Watch HPA:        kubectl get hpa -n ${NAMESPACE} --watch"
-    echo "  Delete all:       kubectl delete namespace ${NAMESPACE}"
+    echo "  View API logs:       kubectl logs -f deployment/jobqueue-api -n ${NAMESPACE}"
+    echo "  View worker logs:    kubectl logs -f deployment/jobqueue-worker -n ${NAMESPACE}"
+    echo "  View dashboard logs: kubectl logs -f deployment/jobqueue-dashboard -n ${NAMESPACE}"
+    echo "  Scale workers:       kubectl scale deployment jobqueue-worker --replicas=5 -n ${NAMESPACE}"
+    echo "  Watch HPA:           kubectl get hpa -n ${NAMESPACE} --watch"
+    echo "  Delete all:          kubectl delete namespace ${NAMESPACE}"
 }
 
 # Cleanup function

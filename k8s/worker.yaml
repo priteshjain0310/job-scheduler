@@ -28,6 +28,11 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: jobqueue-secret
+                  key: DATABASE_URL
           resources:
             requests:
               memory: "256Mi"
