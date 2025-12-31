@@ -1,0 +1,42 @@
+# Worker Dockerfile - shares base with API
+FROM python:3.13-slim as builder
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir poetry==1.8.4
+
+COPY pyproject.toml poetry.lock* ./
+RUN poetry export -f requirements.txt --output requirements.txt --without-hashes
+
+FROM python:3.13-slim as runtime
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd --create-home --shell /bin/bash appuser
+
+COPY --from=builder /app/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY src/ ./src/
+COPY alembic/ ./alembic/
+COPY alembic.ini ./
+
+RUN chown -R appuser:appuser /app
+
+USER appuser
+
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONPATH=/app
+
+# Worker command
+CMD ["python", "-m", "src.worker.main"]

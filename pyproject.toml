@@ -1,0 +1,77 @@
+[tool.poetry]
+name = "job-scheduler"
+version = "1.0.0"
+description = "Production-minded distributed job queue with PostgreSQL, FastAPI workers, and real-time dashboard"
+authors = ["Job Scheduler Team"]
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.13"
+# FastAPI and web
+fastapi = "^0.115.6"
+uvicorn = {extras = ["standard"], version = "^0.34.0"}
+websockets = "^14.1"
+pydantic = "^2.10.4"
+pydantic-settings = "^2.7.0"
+# Database
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.36"}
+asyncpg = "^0.30.0"
+alembic = "^1.14.0"
+# Authentication
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+# Rate limiting
+slowapi = "^0.1.9"
+# Observability
+prometheus-client = "^0.21.1"
+opentelemetry-api = "^1.29.0"
+opentelemetry-sdk = "^1.29.0"
+opentelemetry-instrumentation-fastapi = "^0.50b0"
+opentelemetry-instrumentation-sqlalchemy = "^0.50b0"
+opentelemetry-exporter-otlp = "^1.29.0"
+structlog = "^24.4.0"
+# Utilities
+httpx = "^0.28.1"
+tenacity = "^9.0.0"
+python-multipart = "^0.0.19"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.4"
+pytest-asyncio = "^0.25.0"
+pytest-cov = "^6.0.0"
+httpx = "^0.28.1"
+testcontainers = {extras = ["postgres"], version = "^4.9.0"}
+locust = "^2.32.4"
+ruff = "^0.8.4"
+mypy = "^1.14.1"
+
+[tool.poetry.scripts]
+api = "src.api.main:run"
+worker = "src.worker.main:run"
+reaper = "src.reaper.main:run"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+ignore_missing_imports = true

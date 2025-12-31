@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: jobqueue
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.yaml
+  - postgres.yaml
+  - api.yaml
+  - worker.yaml
+  - reaper.yaml
+  - ingress.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: jobqueue
+  app.kubernetes.io/managed-by: kustomize

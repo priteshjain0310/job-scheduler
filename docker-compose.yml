@@ -1,0 +1,173 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:16-alpine
+    container_name: jobqueue-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: jobqueue
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # API Server
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jobqueue-api
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/jobqueue
+      DATABASE_SYNC_URL: postgresql://postgres:postgres@postgres:5432/jobqueue
+      API_HOST: "0.0.0.0"
+      API_PORT: "8000"
+      API_SECRET_KEY: "dev-secret-key-change-in-production"
+      LOG_LEVEL: INFO
+      LOG_FORMAT: json
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Worker
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: jobqueue-worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/jobqueue
+      DATABASE_SYNC_URL: postgresql://postgres:postgres@postgres:5432/jobqueue
+      WORKER_ID: worker-1
+      WORKER_BATCH_SIZE: "5"
+      WORKER_POLL_INTERVAL_SECONDS: "1"
+      WORKER_LEASE_DURATION_SECONDS: "30"
+      LOG_LEVEL: INFO
+      LOG_FORMAT: json
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
+  # Additional worker for scaling demo
+  worker-2:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: jobqueue-worker-2
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/jobqueue
+      DATABASE_SYNC_URL: postgresql://postgres:postgres@postgres:5432/jobqueue
+      WORKER_ID: worker-2
+      WORKER_BATCH_SIZE: "5"
+      WORKER_POLL_INTERVAL_SECONDS: "1"
+      WORKER_LEASE_DURATION_SECONDS: "30"
+      LOG_LEVEL: INFO
+      LOG_FORMAT: json
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    profiles:
+      - scale
+
+  # Reaper
+  reaper:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: jobqueue-reaper
+    command: ["python", "-m", "src.reaper.main"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/jobqueue
+      DATABASE_SYNC_URL: postgresql://postgres:postgres@postgres:5432/jobqueue
+      REAPER_INTERVAL_SECONDS: "10"
+      LOG_LEVEL: INFO
+      LOG_FORMAT: json
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Database migrations
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jobqueue-migrate
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/jobqueue
+      DATABASE_SYNC_URL: postgresql://postgres:postgres@postgres:5432/jobqueue
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - migrate
+
+  # Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: jobqueue-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    profiles:
+      - observability
+
+  # Jaeger for tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jobqueue-jaeger
+    ports:
+      - "16686:16686"  # UI
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    profiles:
+      - observability
+
+  # Next.js Dashboard
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: jobqueue-dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_WS_URL: ws://localhost:8000
+    depends_on:
+      - api
+    profiles:
+      - dashboard
+
+volumes:
+  postgres_data:
+  prometheus_data:
